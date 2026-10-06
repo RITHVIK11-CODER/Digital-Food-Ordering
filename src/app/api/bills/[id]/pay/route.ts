@@ -11,10 +11,14 @@ export async function POST(
     const body = await request.json();
     const paymentMethod = body.paymentMethod || "UPI";
 
-    let bill;
+    let bill: any = null;
     try {
       bill = await markBillPaidInDb(id, paymentMethod);
     } catch {
+      // Fallback
+    }
+
+    if (!bill) {
       bill = cafeStore.markBillPaid(id, paymentMethod);
     }
     return NextResponse.json(bill);

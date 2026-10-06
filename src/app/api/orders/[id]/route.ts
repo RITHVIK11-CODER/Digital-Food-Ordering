@@ -53,7 +53,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Forbidden: Only Waiter/Owner can mark orders served." }, { status: 403 });
     }
 
-    let order;
+    let order: any = null;
     try {
       order = await updateOrderStatusInDb({
         orderId: validated.orderId,
@@ -64,6 +64,10 @@ export async function PATCH(
         estimatedMinutes: validated.estimatedMinutes,
       });
     } catch {
+      // Fallback
+    }
+
+    if (!order) {
       order = cafeStore.updateOrderStatus({
         orderId: validated.orderId,
         newStatus: validated.status,
