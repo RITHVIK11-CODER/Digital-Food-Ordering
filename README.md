@@ -138,7 +138,7 @@ pnpm start
 | **Chef Station** | `/chef` | Kitchen Display System with live tickets |
 | **Waiter Floor** | `/waiter` | Table map, service calls, and order delivery |
 | **Cashier Desk** | `/cashier` | Billing desk, manual bills, and payments |
-| **Executive Owner** | `/owner` | 15-day analytics, menu editor, and table QRs |
+| **Executive Owner / Admin** | `/admin` or `/owner` | 15-day analytics, menu editor, staff management, and table QRs |
 
 ---
 

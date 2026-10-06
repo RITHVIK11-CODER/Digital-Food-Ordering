@@ -69,12 +69,12 @@ export function StaffHeader({ role, staffName, onRefresh, activeOrdersCount = 0 
               Cashier
             </Link>
             <Link
-              href="/owner"
+              href="/admin"
               className={`px-2.5 py-1 rounded-lg transition-colors ${
-                role === "OWNER" ? "bg-[#242424] text-[#D8B58A] font-semibold" : "text-[#A8A29E] hover:text-[#F6EFE7]"
+                role === "OWNER" || role === "MANAGER" ? "bg-[#242424] text-[#D8B58A] font-semibold" : "text-[#A8A29E] hover:text-[#F6EFE7]"
               }`}
             >
-              Owner
+              Admin
             </Link>
           </div>
 
