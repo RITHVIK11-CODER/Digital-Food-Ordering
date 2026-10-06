@@ -12,14 +12,18 @@ export function getAdminSupabaseClient(): SupabaseClient | null {
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY &&
+    !process.env.SUPABASE_SERVICE_ROLE_KEY.startsWith("your")
+      ? process.env.SUPABASE_SERVICE_ROLE_KEY
+      : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!supabaseUrl || !serviceRoleKey || serviceRoleKey === "your-service-role-key") {
+  if (!supabaseUrl || !key || key.startsWith("your")) {
     return null; // Gracefully fallback when live env credentials are not yet supplied
   }
 
   if (!adminClient) {
-    adminClient = createClient(supabaseUrl, serviceRoleKey, {
+    adminClient = createClient(supabaseUrl, key, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
