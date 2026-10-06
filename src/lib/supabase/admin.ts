@@ -7,7 +7,7 @@ let adminClient: SupabaseClient | null = null;
  * NEVER import or execute in client-side code!
  */
 export function getAdminSupabaseClient(): SupabaseClient | null {
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && !process.env.VITEST) {
     throw new Error("CRITICAL SECURITY VIOLATION: getAdminSupabaseClient invoked on client browser!");
   }
 

@@ -224,4 +224,34 @@ describe("Supabase Production End-to-End Test Suite", () => {
     expect(verifyPermission("CASHIER", "SETTLE_PAYMENT")).toBe(true);
     expect(verifyPermission("CUSTOMER", "ACCEPT_ORDER")).toBe(false);
   });
+
+  it("6. Verifies secure table QR token resolution, raw ID rejection, and session isolation", async () => {
+    const { getTableByIdOrTokenFromDb, getOrCreateTableSessionInDb } = await import("@/lib/supabase/db");
+
+    // 1. Valid Table 1 secure token
+    const table1 = await getTableByIdOrTokenFromDb("vb_tbl_01_tok99a");
+    expect(table1).toBeDefined();
+    expect(table1?.table_number).toBe("Table 1");
+    expect(table1?.qr_code_token).toBe("vb_tbl_01_tok99a");
+
+    // 2. Raw table '1' must NOT match (raw IDs are rejected to prevent URL guessing)
+    const rawLookup = await getTableByIdOrTokenFromDb("1");
+    expect(rawLookup).toBeNull();
+
+    // 3. Fake token must NOT match
+    const fakeLookup = await getTableByIdOrTokenFromDb("vb_tbl_invalid_fake");
+    expect(fakeLookup).toBeNull();
+
+    // 4. Session creation for Table 1
+    const session1 = await getOrCreateTableSessionInDb(table1!.id, "Table 1 Guest");
+    expect(session1).toBeDefined();
+    expect(session1?.table_id).toBe(table1!.id);
+    expect(session1?.is_active).toBe(true);
+
+    // 5. Verify Table 2 has separate secure token
+    const table2 = await getTableByIdOrTokenFromDb("vb_tbl_02_tok88b");
+    expect(table2).toBeDefined();
+    expect(table2?.table_number).toBe("Table 2");
+    expect(table2?.id).not.toBe(table1?.id);
+  });
 });

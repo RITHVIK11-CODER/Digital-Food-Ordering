@@ -48,7 +48,7 @@ export default function OwnerDashboard() {
   const [newItemIsVeg, setNewItemIsVeg] = useState(true);
 
   // QR Modal
-  const [selectedTableQR, setSelectedTableQR] = useState<{ table: CafeTable; dataUrl: string } | null>(null);
+  const [selectedTableQR, setSelectedTableQR] = useState<{ table: CafeTable; dataUrl: string; url?: string } | null>(null);
 
   const fetchData = async () => {
     try {
@@ -136,9 +136,12 @@ export default function OwnerDashboard() {
 
   const handleShowQR = async (table: CafeTable) => {
     try {
-      const qrUrl = `${window.location.origin}/table/${table.qr_code_token}`;
+      const baseUrl =
+        process.env.NEXT_PUBLIC_APP_URL ||
+        (typeof window !== "undefined" ? window.location.origin : "https://digital-food-ordering-82k6.vercel.app");
+      const qrUrl = `${baseUrl.replace(/\/$/, "")}/table/${table.qr_code_token}`;
       const dataUrl = await QRCode.toDataURL(qrUrl, { width: 300, margin: 2 });
-      setSelectedTableQR({ table, dataUrl });
+      setSelectedTableQR({ table, dataUrl, url: qrUrl });
     } catch (err) {
       toast.error("Failed to generate QR");
     }
@@ -549,9 +552,16 @@ export default function OwnerDashboard() {
               <img src={selectedTableQR.dataUrl} alt="Table QR" className="w-48 h-48 mx-auto" />
             </div>
 
-            <p className="text-xs text-[#D8B58A] font-mono">
-              Token: {selectedTableQR.table.qr_code_token}
-            </p>
+            <div className="space-y-1">
+              <p className="text-xs text-[#D8B58A] font-mono">
+                Token: {selectedTableQR.table.qr_code_token}
+              </p>
+              {selectedTableQR.url && (
+                <p className="text-[11px] text-[#A8A29E] font-mono break-all bg-[#080808] p-2 rounded border border-[#242424]">
+                  {selectedTableQR.url}
+                </p>
+              )}
+            </div>
 
             <div className="pt-2 flex items-center justify-center gap-2">
               <a

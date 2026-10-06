@@ -65,19 +65,35 @@ export async function getTablesFromDb(): Promise<CafeTable[]> {
   return data || [];
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function getTableByIdOrTokenFromDb(idOrToken: string): Promise<CafeTable | null> {
   const supabase = getAdminSupabaseClient();
-  if (!supabase) return null;
+  if (!supabase || !idOrToken) return null;
 
-  const { data, error } = await supabase
+  // 1. Primary secure QR token lookup
+  const { data: byToken, error: tokenErr } = await supabase
     .from("tables")
     .select("*")
-    .or(`id.eq.${idOrToken},qr_code_token.eq.${idOrToken},table_number.ilike.${idOrToken}`)
+    .eq("qr_code_token", idOrToken)
     .limit(1)
-    .single();
+    .maybeSingle();
 
-  if (error) return null;
-  return data;
+  if (byToken) return byToken;
+
+  // 2. Fallback lookup: only if idOrToken is a valid UUID format
+  if (UUID_REGEX.test(idOrToken)) {
+    const { data: byId, error: idErr } = await supabase
+      .from("tables")
+      .select("*")
+      .eq("id", idOrToken)
+      .limit(1)
+      .maybeSingle();
+
+    if (byId) return byId;
+  }
+
+  return null;
 }
 
 export async function updateTableInDb(tableId: string, updates: Partial<CafeTable>): Promise<CafeTable | null> {

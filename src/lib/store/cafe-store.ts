@@ -150,7 +150,7 @@ class CafeStore {
 
   public getTableByIdOrToken(tableIdOrToken: string): CafeTable | undefined {
     return this.tables.find(
-      (t) => t.id === tableIdOrToken || t.qr_code_token === tableIdOrToken || t.table_number.toLowerCase() === tableIdOrToken.toLowerCase()
+      (t) => t.id === tableIdOrToken || t.qr_code_token === tableIdOrToken
     );
   }
 
