@@ -429,9 +429,10 @@ export async function getOrdersFromDb(filters?: { tableId?: string; sessionId?: 
 
 export async function getOrderByIdFromDb(orderId: string): Promise<Order | null> {
   const supabase = getAdminSupabaseClient();
-  if (!supabase) return null;
+  if (!supabase || !orderId) return null;
 
-  const { data, error } = await supabase
+  // 1. Try order_number match
+  const { data: byOrderNum } = await supabase
     .from("orders")
     .select(`
       *,
@@ -439,11 +440,30 @@ export async function getOrderByIdFromDb(orderId: string): Promise<Order | null>
       items:order_items(*, options:order_item_options(*)),
       events:order_events(*)
     `)
-    .or(`id.eq.${orderId},order_number.eq.${orderId}`)
-    .single();
+    .eq("order_number", orderId)
+    .limit(1)
+    .maybeSingle();
 
-  if (error) return null;
-  return data;
+  if (byOrderNum) return byOrderNum;
+
+  // 2. Fallback: only if valid UUID format
+  if (UUID_REGEX.test(orderId)) {
+    const { data: byId } = await supabase
+      .from("orders")
+      .select(`
+        *,
+        table:tables(*),
+        items:order_items(*, options:order_item_options(*)),
+        events:order_events(*)
+      `)
+      .eq("id", orderId)
+      .limit(1)
+      .maybeSingle();
+
+    if (byId) return byId;
+  }
+
+  return null;
 }
 
 export async function updateOrderStatusInDb(params: {
@@ -570,16 +590,31 @@ export async function getBillsFromDb(): Promise<Bill[]> {
 
 export async function getBillByIdFromDb(billId: string): Promise<Bill | null> {
   const supabase = getAdminSupabaseClient();
-  if (!supabase) return null;
+  if (!supabase || !billId) return null;
 
-  const { data, error } = await supabase
+  // 1. Try bill_number match
+  const { data: byBillNum } = await supabase
     .from("bills")
     .select(`*, table:tables(*), splits:bill_splits(*)`)
-    .or(`id.eq.${billId},bill_number.eq.${billId}`)
-    .single();
+    .eq("bill_number", billId)
+    .limit(1)
+    .maybeSingle();
 
-  if (error) return null;
-  return data;
+  if (byBillNum) return byBillNum;
+
+  // 2. Fallback: only if valid UUID format
+  if (UUID_REGEX.test(billId)) {
+    const { data: byId } = await supabase
+      .from("bills")
+      .select(`*, table:tables(*), splits:bill_splits(*)`)
+      .eq("id", billId)
+      .limit(1)
+      .maybeSingle();
+
+    if (byId) return byId;
+  }
+
+  return null;
 }
 
 export async function markBillPaidInDb(billId: string, paymentMethod: "CASH" | "CARD" | "UPI" = "UPI"): Promise<Bill> {

@@ -43,7 +43,7 @@ export const UpdateOrderStatusSchema = z.object({
     "CANCELLED",
     "REJECTED",
   ]),
-  actorType: z.enum(["CHEF", "WAITER", "CASHIER", "OWNER", "SYSTEM"]),
+  actorType: z.enum(["CHEF", "WAITER", "CASHIER", "OWNER", "SYSTEM"]).optional().default("CHEF"),
   actorId: z.string().optional(),
   notes: z.string().optional(),
   estimatedMinutes: z.number().optional(),
