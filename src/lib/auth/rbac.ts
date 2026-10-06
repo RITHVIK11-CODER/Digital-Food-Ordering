@@ -60,3 +60,4 @@ export function extractAuthContext(req: Request): AuthContext {
     tableSessionId: tableSessionHeader || undefined,
   };
 }
+

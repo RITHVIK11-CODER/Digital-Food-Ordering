@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "seed": "npx tsx scripts/seed-supabase.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -25,6 +26,7 @@
     "recharts": "^2.15.1",
     "sonner": "^2.0.1",
     "tailwind-merge": "^3.0.1",
+    "web-push": "^3.6.7",
     "zod": "^3.24.2"
   },
   "devDependencies": {
@@ -42,4 +44,3 @@
     "vitest": "^3.0.5"
   }
 }
-

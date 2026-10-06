@@ -55,3 +55,4 @@ describe("Server-Side RBAC Enforcement Suite", () => {
     expect(verifyPermission("CUSTOMER", "CREATE_ORDER")).toBe(true);
   });
 });
+

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { markBillPaidInDb } from "@/lib/supabase/db";
 import { cafeStore } from "@/lib/store/cafe-store";
 
 export async function POST(
@@ -10,10 +11,14 @@ export async function POST(
     const body = await request.json();
     const paymentMethod = body.paymentMethod || "UPI";
 
-    const bill = cafeStore.markBillPaid(id, paymentMethod);
+    let bill;
+    try {
+      bill = await markBillPaidInDb(id, paymentMethod);
+    } catch {
+      bill = cafeStore.markBillPaid(id, paymentMethod);
+    }
     return NextResponse.json(bill);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 }
-

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { getMenuItemByIdFromDb, updateMenuItemInDb } from "@/lib/supabase/db";
 import { cafeStore } from "@/lib/store/cafe-store";
+import { extractAuthContext, verifyPermission } from "@/lib/auth/rbac";
 
 export async function GET(
   request: Request,
@@ -7,7 +9,9 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const item = cafeStore.getMenuItemById(id);
+    const dbItem = await getMenuItemByIdFromDb(id);
+    const item = dbItem || cafeStore.getMenuItemById(id);
+
     if (!item) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
@@ -23,24 +27,18 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
+    const auth = extractAuthContext(request);
     const body = await request.json();
-    const updated = cafeStore.updateMenuItem(id, body);
+
+    // Availability toggle allowed for CHEF, MANAGER, OWNER
+    if (body.is_available !== undefined && !verifyPermission(auth.role, "TOGGLE_ITEM_AVAILABILITY")) {
+      return NextResponse.json({ error: "Forbidden: Not permitted to toggle availability." }, { status: 403 });
+    }
+
+    const dbUpdated = await updateMenuItemInDb(id, body);
+    const updated = dbUpdated || cafeStore.updateMenuItem(id, body);
     return NextResponse.json(updated);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 }
-
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const deleted = cafeStore.deleteMenuItem(id);
-    return NextResponse.json({ success: deleted });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
-  }
-}
-

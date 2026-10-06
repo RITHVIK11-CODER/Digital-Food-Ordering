@@ -74,18 +74,34 @@ A complete, production-grade, real-time QR-based digital cafe ordering and kitch
 ### 2. Environment Setup
 Create a `.env.local` file based on `.env.example`:
 ```env
+# Supabase Configuration
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
+# Application Settings
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 NEXT_PUBLIC_CAFE_NAME="Velvet Bloom Café"
 NEXT_PUBLIC_CAFE_TAGLINE="Sip. Savor. Bloom."
 NEXT_PUBLIC_TECH_BRAND="Powered by Kage Origin"
 NEXT_PUBLIC_CURRENCY_SYMBOL="₹"
+
+# Web Push Keys (VAPID)
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=your-vapid-public-key
+VAPID_PRIVATE_KEY=your-vapid-private-key
 ```
 
-### 3. Install Dependencies
+### 3. Database Migrations & Seeding
+Apply SQL migrations in Supabase SQL editor from:
+1. `supabase/migrations/20261006000000_init_schema.sql`
+2. `supabase/migrations/20261006000001_rls_policies_and_stored_procedures.sql`
+
+Optionally seed initial café data:
+```bash
+pnpm seed
+```
+
+### 4. Install Dependencies
 ```bash
 pnpm install
 ```

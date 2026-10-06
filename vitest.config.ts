@@ -5,6 +5,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    testTimeout: 20000,
   },
   resolve: {
     alias: {
@@ -12,4 +13,3 @@ export default defineConfig({
     },
   },
 });
-

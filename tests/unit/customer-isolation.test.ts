@@ -38,3 +38,4 @@ describe("Customer Session Isolation & Security Barrier", () => {
     expect(table2Orders.some((o) => o.id === order1.id)).toBe(false);
   });
 });
+

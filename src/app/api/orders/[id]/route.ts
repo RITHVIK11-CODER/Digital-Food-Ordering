@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getOrderByIdFromDb, updateOrderStatusInDb } from "@/lib/supabase/db";
 import { cafeStore } from "@/lib/store/cafe-store";
 import { UpdateOrderStatusSchema } from "@/lib/validation/schemas";
 import { extractAuthContext, verifyPermission } from "@/lib/auth/rbac";
@@ -10,7 +11,9 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const order = cafeStore.getOrderById(id);
+    const dbOrder = await getOrderByIdFromDb(id);
+    const order = dbOrder || cafeStore.getOrderById(id);
+
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
@@ -30,8 +33,12 @@ export async function PATCH(
     const validated = UpdateOrderStatusSchema.parse({ ...json, orderId: id });
     const auth = extractAuthContext(request);
 
-    // Map status transition to permission key
-    const roleCandidate: UserRole = auth.role !== "CUSTOMER" ? auth.role : (validated.actorType === "SYSTEM" ? "OWNER" : validated.actorType as UserRole);
+    const roleCandidate: UserRole =
+      auth.role !== "CUSTOMER"
+        ? auth.role
+        : validated.actorType === "SYSTEM"
+        ? "OWNER"
+        : (validated.actorType as UserRole);
 
     if (validated.status === "ACCEPTED" && !verifyPermission(roleCandidate, "ACCEPT_ORDER")) {
       return NextResponse.json({ error: "Forbidden: Only Chef/Owner can accept orders." }, { status: 403 });
@@ -46,14 +53,26 @@ export async function PATCH(
       return NextResponse.json({ error: "Forbidden: Only Waiter/Owner can mark orders served." }, { status: 403 });
     }
 
-    const order = cafeStore.updateOrderStatus({
-      orderId: validated.orderId,
-      newStatus: validated.status,
-      actorType: validated.actorType,
-      actorId: validated.actorId,
-      notes: validated.notes,
-      estimatedMinutes: validated.estimatedMinutes,
-    });
+    let order;
+    try {
+      order = await updateOrderStatusInDb({
+        orderId: validated.orderId,
+        newStatus: validated.status,
+        actorType: validated.actorType,
+        actorId: validated.actorId,
+        notes: validated.notes,
+        estimatedMinutes: validated.estimatedMinutes,
+      });
+    } catch {
+      order = cafeStore.updateOrderStatus({
+        orderId: validated.orderId,
+        newStatus: validated.status,
+        actorType: validated.actorType,
+        actorId: validated.actorId,
+        notes: validated.notes,
+        estimatedMinutes: validated.estimatedMinutes,
+      });
+    }
 
     return NextResponse.json(order);
   } catch (error: any) {
