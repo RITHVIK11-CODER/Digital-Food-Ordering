@@ -43,3 +43,4 @@ export function TableBadge({ table, activeOrdersCount = 0, onClick, isSelected }
     </button>
   );
 }
+

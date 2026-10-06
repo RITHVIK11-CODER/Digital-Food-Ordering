@@ -319,3 +319,4 @@ ALTER PUBLICATION supabase_realtime ADD TABLE tables;
 ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
 ALTER PUBLICATION supabase_realtime ADD TABLE service_requests;
 ALTER PUBLICATION supabase_realtime ADD TABLE menu_items;
+

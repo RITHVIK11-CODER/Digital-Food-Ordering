@@ -54,3 +54,4 @@ export function LoadingState({ message = "Loading handcrafted menu..." }: { mess
     </div>
   );
 }
+

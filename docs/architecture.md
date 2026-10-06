@@ -36,3 +36,4 @@ graph TD
 
 4. **Offline Resilient PWA:**
    - Service worker caches core UI assets and fonts while guaranteeing that dynamic pricing and availability checks always remain fresh and authoritative.
+

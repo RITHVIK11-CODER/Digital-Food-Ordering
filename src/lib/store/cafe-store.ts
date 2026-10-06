@@ -918,3 +918,4 @@ class CafeStore {
 const globalForCafe = globalThis as unknown as { cafeStore: CafeStore };
 export const cafeStore = globalForCafe.cafeStore || new CafeStore();
 if (process.env.NODE_ENV !== "production") globalForCafe.cafeStore = cafeStore;
+

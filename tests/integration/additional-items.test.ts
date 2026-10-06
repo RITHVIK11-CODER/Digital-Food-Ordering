@@ -36,3 +36,4 @@ describe('Additional Items & Active Order Recalculation Integration', () => {
     expect(lastEvent?.notes).toContain('Added');
   });
 });
+

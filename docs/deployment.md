@@ -19,3 +19,4 @@
    - `NEXT_PUBLIC_TECH_BRAND="Powered by Kage Origin"`
    - `NEXT_PUBLIC_CURRENCY_SYMBOL="₹"`
 3. Deploy!
+

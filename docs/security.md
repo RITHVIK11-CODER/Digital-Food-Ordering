@@ -10,3 +10,4 @@ Client requests submit only `menuItemId`, `quantity`, and selected `optionNames`
 
 ## 3. Secret Management
 Database service role keys, VAPID push keys, and administration tokens are strictly kept in environment variables and are never bundled into client distributions.
+

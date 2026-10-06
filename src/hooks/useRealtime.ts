@@ -45,3 +45,4 @@ export function useRealtime(events: Record<string, (data: any) => void>) {
     };
   }, [events]);
 }
+

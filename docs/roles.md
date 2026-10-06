@@ -16,3 +16,4 @@
 | View Rolling 15-Day Analytics | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 | Pause Kitchen Ordering (Rush Mode) | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 | Manage Staff & Table QR Codes | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+

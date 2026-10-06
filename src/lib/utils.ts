@@ -50,3 +50,4 @@ export function generateBillNumber(): string {
   }
   return result;
 }
+

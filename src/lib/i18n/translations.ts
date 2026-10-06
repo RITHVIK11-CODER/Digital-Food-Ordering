@@ -101,3 +101,4 @@ export const DICTIONARY: Record<SupportedLanguage, Record<string, string>> = {
     kitchen_busy: "रसोई में व्यस्तता अधिक है",
   },
 };
+

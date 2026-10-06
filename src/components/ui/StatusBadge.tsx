@@ -106,3 +106,4 @@ export function TableStatusBadge({ status, className }: StatusBadgeProps) {
       return <Badge variant="secondary" className={className}>{status}</Badge>;
   }
 }
+

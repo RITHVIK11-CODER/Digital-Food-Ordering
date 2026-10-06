@@ -65,3 +65,4 @@ export function calculateEqualSplit(totalAmount: number, numberOfPeople: number)
 
   return splits;
 }
+

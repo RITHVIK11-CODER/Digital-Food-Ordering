@@ -203,3 +203,4 @@ export function BillSummary({ bill, onPay, onRequestSplit, isStaff = false }: Bi
     </div>
   );
 }
+

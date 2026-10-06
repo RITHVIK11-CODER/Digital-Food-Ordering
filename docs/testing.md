@@ -23,3 +23,4 @@ pnpm test
 3. **`tests/integration/additional-items.test.ts`**
    - Live order item additions by floor staff.
    - Dynamic recalculation of order totals and automatic audit timeline logging.
+

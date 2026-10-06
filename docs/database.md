@@ -37,3 +37,4 @@ erDiagram
 - **`payments`**: Payment transaction records (UPI, Card, Cash).
 - **`reviews`**: Verified customer ratings (1-5 stars) and feedback.
 - **`notifications` & `service_requests`**: Real-time staff assistance alerts and floor requests.
+

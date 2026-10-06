@@ -77,3 +77,4 @@ export function CafeLogo({
 
   return content;
 }
+

@@ -106,3 +106,4 @@ export function StaffHeader({ role, staffName, onRefresh, activeOrdersCount = 0 
     </header>
   );
 }
+

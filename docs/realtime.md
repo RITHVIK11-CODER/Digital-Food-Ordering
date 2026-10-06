@@ -26,3 +26,4 @@ The Velvet Bloom Café platform utilizes real-time publish-subscribe communicati
 The `useRealtime` hook continuously monitors connection health. If connection drops:
 1. Reconnects automatically with an exponential backoff retry.
 2. Performs an authoritative state synchronization from the API upon reconnection.
+

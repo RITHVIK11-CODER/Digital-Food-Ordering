@@ -136,3 +136,4 @@ Comprehensive system architecture guides are available in the [`docs/`](./docs) 
 - [`docs/roles.md`](./docs/roles.md) — Role-based permission matrix
 - [`docs/testing.md`](./docs/testing.md) — Automated test coverage
 - [`docs/deployment.md`](./docs/deployment.md) — Production deployment instructions (Vercel & Supabase)
+

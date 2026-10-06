@@ -83,3 +83,4 @@ export const ServiceRequestSchema = z.object({
   requestType: z.enum(["WATER", "CLEANING", "WAITER_CALL", "BILL", "OTHER"]),
   notes: z.string().max(200).optional(),
 });
+
