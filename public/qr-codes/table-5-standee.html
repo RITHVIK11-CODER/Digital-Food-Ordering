@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Table 5 QR Standee — Velvet Bloom Café</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap');
+    
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #080808;
+      color: #F6EFE7;
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .standee-card {
+      width: 380px;
+      background: #171717;
+      border: 2px solid #D8B58A;
+      border-radius: 28px;
+      padding: 36px 28px;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8), 0 0 40px rgba(216,181,138,0.1);
+      position: relative;
+    }
+    .brand-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 26px;
+      letter-spacing: 2px;
+      color: #F6EFE7;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .brand-tagline {
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      color: #D8B58A;
+      font-size: 14px;
+      letter-spacing: 1px;
+      margin-bottom: 24px;
+    }
+    .qr-container {
+      background: #FFFFFF;
+      padding: 16px;
+      border-radius: 20px;
+      display: inline-block;
+      margin: 0 auto 20px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+    }
+    .qr-img {
+      width: 220px;
+      height: 220px;
+      display: block;
+    }
+    .table-badge {
+      background: rgba(216,181,138,0.15);
+      border: 1px solid rgba(216,181,138,0.4);
+      color: #D8B58A;
+      display: inline-block;
+      padding: 6px 18px;
+      border-radius: 9999px;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+    .action-prompt {
+      font-size: 15px;
+      font-weight: 600;
+      color: #F6EFE7;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .sub-prompt {
+      font-size: 12px;
+      color: #A8A29E;
+      margin-bottom: 20px;
+    }
+    .tech-credit {
+      border-top: 1px solid #242424;
+      padding-top: 14px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #A8A29E;
+    }
+    @media print {
+      body { background: #FFFFFF; }
+      .standee-card {
+        border-color: #080808;
+        box-shadow: none;
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="standee-card">
+    <div class="brand-title">Velvet Bloom</div>
+    <div class="brand-tagline">Sip. Savor. Bloom.</div>
+
+    <div class="table-badge">Table 5</div>
+
+    <div class="qr-container">
+      <img src="data:image/png;base64,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" class="qr-img" alt="Table 5 QR Code" />
+    </div>
+
+    <div class="action-prompt">Scan to Order & Pay</div>
+    <div class="sub-prompt">Point your smartphone camera at the code</div>
+
+    <div class="tech-credit">Powered by Kage Origin</div>
+  </div>
+</body>
+</html>
