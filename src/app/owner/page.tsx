@@ -39,13 +39,21 @@ export default function OwnerDashboard() {
   const [settings, setSettings] = useState<CafeSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // New Menu Item modal
+  // New & Edit Menu Item modal
   const [isNewItemModalOpen, setIsNewItemModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [newItemName, setNewItemName] = useState("");
   const [newItemCategory, setNewItemCategory] = useState("");
   const [newItemPrice, setNewItemPrice] = useState<number>(250);
   const [newItemDesc, setNewItemDesc] = useState("");
   const [newItemIsVeg, setNewItemIsVeg] = useState(true);
+  const [newItemImageUrl, setNewItemImageUrl] = useState("");
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+
+  // Settings update state
+  const [taxRateInput, setTaxRateInput] = useState<number>(5.0);
+  const [prepTimeInput, setPrepTimeInput] = useState<number>(15);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   // QR Modal
   const [selectedTableQR, setSelectedTableQR] = useState<{ table: CafeTable; dataUrl: string; url?: string } | null>(null);
@@ -68,7 +76,14 @@ export default function OwnerDashboard() {
       }
       if (tRes.ok) setTables(await tRes.json());
       if (uRes.ok) setUsers(await uRes.json());
-      if (sRes.ok) setSettings(await sRes.json());
+      if (sRes.ok) {
+        const sData = await sRes.json();
+        setSettings(sData);
+        if (sData) {
+          setTaxRateInput(sData.tax_rate ?? 5.0);
+          setPrepTimeInput(sData.average_prep_time_minutes ?? 15);
+        }
+      }
     } catch (err) {
       console.error("Failed to load owner data", err);
     } finally {
@@ -98,39 +113,158 @@ export default function OwnerDashboard() {
     }
   };
 
-  const handleCreateMenuItem = async () => {
+  const handleOpenEditModal = (item: MenuItem) => {
+    setEditingItem(item);
+    setNewItemName(item.name);
+    setNewItemCategory(item.category_id || "");
+    setNewItemPrice(item.price);
+    setNewItemDesc(item.description || "");
+    setNewItemIsVeg(item.is_veg);
+    setNewItemImageUrl(item.image_url || "");
+    setIsNewItemModalOpen(true);
+  };
+
+  const handleOpenAddModal = () => {
+    setEditingItem(null);
+    setNewItemName("");
+    setNewItemCategory(categories[0]?.id || "");
+    setNewItemPrice(250);
+    setNewItemDesc("");
+    setNewItemIsVeg(true);
+    setNewItemImageUrl("");
+    setIsNewItemModalOpen(true);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/menu/upload-image", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setNewItemImageUrl(data.imageUrl);
+        toast.success("Image uploaded successfully!");
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Failed to upload image");
+      }
+    } catch (err) {
+      toast.error("Failed to upload image");
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const handleSaveMenuItem = async () => {
     if (!newItemName || !newItemCategory) {
       toast.error("Name and category are required");
       return;
     }
 
     try {
-      const res = await fetch("/api/menu", {
-        method: "POST",
+      if (editingItem) {
+        // Update
+        const res = await fetch(`/api/menu/${editingItem.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: newItemName,
+            category_id: newItemCategory,
+            description: newItemDesc,
+            price: newItemPrice,
+            is_veg: newItemIsVeg,
+            image_url: newItemImageUrl || null,
+          }),
+        });
+
+        if (res.ok) {
+          const updated = await res.json();
+          setMenuItems((prev) => prev.map((it) => (it.id === editingItem.id ? updated : it)));
+          setIsNewItemModalOpen(false);
+          toast.success("Dish updated successfully!");
+        }
+      } else {
+        // Create
+        const res = await fetch("/api/menu", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            category_id: newItemCategory,
+            name: newItemName,
+            description: newItemDesc,
+            price: newItemPrice,
+            is_veg: newItemIsVeg,
+            image_url: newItemImageUrl || null,
+            is_available: true,
+            is_bestseller: false,
+            is_chef_special: false,
+            preparation_time_minutes: 15,
+          }),
+        });
+
+        if (res.ok) {
+          const item = await res.json();
+          setMenuItems((prev) => [item, ...prev]);
+          setIsNewItemModalOpen(false);
+          toast.success("New dish added to menu!");
+        }
+      }
+    } catch {
+      toast.error("Failed to save menu item");
+    }
+  };
+
+  const handleDeleteMenuItem = async (itemId: string, itemName: string) => {
+    if (!confirm(`Are you sure you want to remove "${itemName}" from the menu?`)) return;
+
+    try {
+      const res = await fetch(`/api/menu/${itemId}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        setMenuItems((prev) => prev.filter((i) => i.id !== itemId));
+        toast.success(`"${itemName}" removed from menu.`);
+      } else {
+        toast.error("Failed to delete menu item");
+      }
+    } catch {
+      toast.error("Failed to delete menu item");
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    setIsSavingSettings(true);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          category_id: newItemCategory,
-          name: newItemName,
-          description: newItemDesc,
-          price: newItemPrice,
-          is_veg: newItemIsVeg,
-          is_available: true,
-          is_bestseller: false,
-          is_chef_special: false,
-          preparation_time_minutes: 15,
+          tax_rate: Number(taxRateInput),
+          average_prep_time_minutes: Number(prepTimeInput),
         }),
       });
 
       if (res.ok) {
-        const item = await res.json();
-        setMenuItems((prev) => [item, ...prev]);
-        setIsNewItemModalOpen(false);
-        setNewItemName("");
-        setNewItemDesc("");
-        toast.success("New dish added to menu!");
+        const updated = await res.json();
+        setSettings(updated);
+        toast.success("Operational settings updated successfully!");
+      } else {
+        toast.error("Failed to update settings");
       }
     } catch {
-      toast.error("Failed to create menu item");
+      toast.error("Failed to update settings");
+    } finally {
+      setIsSavingSettings(false);
     }
   };
 
@@ -341,7 +475,7 @@ export default function OwnerDashboard() {
                   <Button
                     variant="primary"
                     size="sm"
-                    onClick={() => setIsNewItemModalOpen(true)}
+                    onClick={handleOpenAddModal}
                     className="text-xs gap-1.5"
                   >
                     <Plus className="w-4 h-4" />
@@ -356,30 +490,54 @@ export default function OwnerDashboard() {
                       className="bg-[#171717] border border-[#242424] rounded-2xl p-4 flex flex-col justify-between space-y-3"
                     >
                       <div className="flex items-start gap-3">
-                        {item.image_url && (
+                        {item.image_url ? (
                           <img
                             src={item.image_url}
                             alt={item.name}
                             className="w-16 h-16 rounded-xl object-cover border border-[#2e2e2e] flex-shrink-0"
                           />
+                        ) : (
+                          <div className="w-16 h-16 rounded-xl bg-[#242424] border border-[#2e2e2e] flex items-center justify-center flex-shrink-0 text-xl">
+                            ☕
+                          </div>
                         )}
                         <div className="flex flex-col flex-1">
-                          <span className="font-serif text-sm font-medium text-[#F6EFE7]">
-                            {item.name}
-                          </span>
+                          <div className="flex items-start justify-between">
+                            <span className="font-serif text-sm font-medium text-[#F6EFE7]">
+                              {item.name}
+                            </span>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                              item.is_veg 
+                                ? "bg-green-950/40 text-green-400 border-green-800/40" 
+                                : "bg-red-950/40 text-red-400 border-red-800/40"
+                            }`}>
+                              {item.is_veg ? "VEG" : "NON-VEG"}
+                            </span>
+                          </div>
                           <span className="font-mono text-xs font-bold text-[#D8B58A] mt-0.5">
                             {formatCurrency(item.price)}
                           </span>
                           <span className="text-[10px] text-[#A8A29E] mt-1 line-clamp-1">
-                            {item.description}
+                            {item.description || "No description provided."}
                           </span>
                         </div>
                       </div>
 
-                      <div className="pt-2 border-t border-[#242424] flex items-center justify-between">
-                        <span className={`text-[11px] font-semibold ${item.is_available ? "text-[#6FAF82]" : "text-[#C96B6B]"}`}>
-                          {item.is_available ? "● Available" : "○ Sold Out"}
-                        </span>
+                      <div className="pt-2 border-t border-[#242424] flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleOpenEditModal(item)}
+                            className="text-[11px] text-[#A8A29E] hover:text-[#D8B58A] px-2 py-1 rounded bg-[#242424] hover:bg-[#2a2a2a] transition-colors"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteMenuItem(item.id, item.name)}
+                            className="text-[11px] text-[#C96B6B] hover:text-red-400 px-2 py-1 rounded bg-[#242424] hover:bg-red-950/30 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
 
                         <Button
                           variant={item.is_available ? "outline" : "primary"}
@@ -482,10 +640,10 @@ export default function OwnerDashboard() {
               <div className="bg-[#171717] border border-[#242424] rounded-2xl p-6 space-y-6 max-w-2xl">
                 <div className="pb-3 border-b border-[#242424]">
                   <h3 className="font-serif text-lg font-normal text-[#F6EFE7]">
-                    Operational Controls
+                    Operational Controls & GST Configuration
                   </h3>
                   <p className="text-xs text-[#A8A29E]">
-                    Manage kitchen load status and global digital ordering behaviors
+                    Manage kitchen ordering pause, standard tax rates, and preparation time
                   </p>
                 </div>
 
@@ -512,19 +670,42 @@ export default function OwnerDashboard() {
                   </Button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 text-xs">
-                  <div className="bg-[#242424]/40 p-3 rounded-xl border border-[#2e2e2e]">
-                    <span className="text-[#A8A29E] block mb-1">Standard Tax Rate</span>
-                    <span className="font-mono text-sm font-bold text-[#F6EFE7]">
-                      {settings.tax_rate}% (GST)
-                    </span>
+                {/* Tax & Prep time inputs */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="bg-[#242424]/40 p-4 rounded-xl border border-[#2e2e2e] space-y-2">
+                    <label className="text-[#A8A29E] block text-xs font-medium">Standard GST Tax Rate (%)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={taxRateInput}
+                      onChange={(e) => setTaxRateInput(parseFloat(e.target.value) || 0)}
+                      className="w-full bg-[#171717] border border-[#2e2e2e] rounded-lg p-2 text-sm text-[#F6EFE7] font-mono outline-none"
+                    />
+                    <p className="text-[10px] text-[#A8A29E]">Applied dynamically across all digital orders and bills.</p>
                   </div>
-                  <div className="bg-[#242424]/40 p-3 rounded-xl border border-[#2e2e2e]">
-                    <span className="text-[#A8A29E] block mb-1">Average Prep Time</span>
-                    <span className="font-mono text-sm font-bold text-[#F6EFE7]">
-                      {settings.average_prep_time_minutes} minutes
-                    </span>
+
+                  <div className="bg-[#242424]/40 p-4 rounded-xl border border-[#2e2e2e] space-y-2">
+                    <label className="text-[#A8A29E] block text-xs font-medium">Average Prep Time (Minutes)</label>
+                    <input
+                      type="number"
+                      value={prepTimeInput}
+                      onChange={(e) => setPrepTimeInput(parseInt(e.target.value, 10) || 15)}
+                      className="w-full bg-[#171717] border border-[#2e2e2e] rounded-lg p-2 text-sm text-[#F6EFE7] font-mono outline-none"
+                    />
+                    <p className="text-[10px] text-[#A8A29E]">Default estimated delivery time shown to guests.</p>
                   </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleSaveSettings}
+                    disabled={isSavingSettings}
+                    className="text-xs"
+                  >
+                    {isSavingSettings ? "Saving Settings..." : "Save Operations Settings"}
+                  </Button>
                 </div>
               </div>
             )}
@@ -578,13 +759,13 @@ export default function OwnerDashboard() {
         </div>
       )}
 
-      {/* Add New Menu Item Modal */}
+      {/* Add / Edit Menu Item Modal */}
       {isNewItemModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="w-full max-w-md bg-[#171717] border border-[#2e2e2e] rounded-2xl p-6 shadow-2xl space-y-4 text-[#F6EFE7]">
             <div className="flex items-center justify-between pb-3 border-b border-[#242424]">
               <h3 className="font-serif text-lg font-normal text-[#F6EFE7]">
-                Add New Dish to Menu
+                {editingItem ? `Edit "${editingItem.name}"` : "Add New Dish to Menu"}
               </h3>
               <button
                 onClick={() => setIsNewItemModalOpen(false)}
@@ -645,6 +826,28 @@ export default function OwnerDashboard() {
                 />
               </div>
 
+              {/* Dish Photo Upload */}
+              <div>
+                <label className="text-xs text-[#A8A29E] block mb-1">Dish Image / Photo</label>
+                <div className="flex items-center gap-3">
+                  {newItemImageUrl && (
+                    <img
+                      src={newItemImageUrl}
+                      alt="Preview"
+                      className="w-12 h-12 rounded-xl object-cover border border-[#2e2e2e]"
+                    />
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={isUploadingImage}
+                    className="text-xs text-[#A8A29E] file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:bg-[#242424] file:text-[#D8B58A] file:cursor-pointer"
+                  />
+                </div>
+                {isUploadingImage && <span className="text-[10px] text-[#D8B58A] mt-1 block">Uploading image...</span>}
+              </div>
+
               <div className="flex items-center gap-2 pt-1">
                 <input
                   type="checkbox"
@@ -671,10 +874,10 @@ export default function OwnerDashboard() {
               <Button
                 variant="primary"
                 size="sm"
-                onClick={handleCreateMenuItem}
+                onClick={handleSaveMenuItem}
                 className="text-xs"
               >
-                Save Dish
+                {editingItem ? "Update Dish" : "Save Dish"}
               </Button>
             </div>
           </div>
@@ -683,4 +886,6 @@ export default function OwnerDashboard() {
     </div>
   );
 }
+
+
 

@@ -33,39 +33,90 @@ export default function ChefDashboard() {
     fetchOrders();
   }, []);
 
-  const playChime = () => {
+  const [audioCtx, setAudioCtx] = useState<AudioContext | null>(null);
+
+  // Initialize or resume Web Audio API context
+  const getOrInitAudioContext = () => {
+    try {
+      let ctx = audioCtx;
+      if (!ctx || ctx.state === "closed") {
+        ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        setAudioCtx(ctx);
+      }
+      if (ctx.state === "suspended") {
+        ctx.resume();
+      }
+      return ctx;
+    } catch {
+      return null;
+    }
+  };
+
+  const playChime = (type: "NEW_ORDER" | "ADDITIONAL_ITEM" = "NEW_ORDER") => {
     if (!soundEnabled) return;
     try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
-      osc.frequency.setValueAtTime(880.0, audioCtx.currentTime + 0.15); // A5
-      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.5);
-    } catch {}
+      const ctx = getOrInitAudioContext();
+      if (!ctx) return;
+
+      if (type === "NEW_ORDER") {
+        // Harmonic luxury 3-tone ascending chord
+        const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+        notes.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.12);
+          gain.gain.setValueAtTime(0, ctx.currentTime + idx * 0.12);
+          gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + idx * 0.12 + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.12 + 0.6);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + idx * 0.12);
+          osc.stop(ctx.currentTime + idx * 0.12 + 0.6);
+        });
+      } else {
+        // Alert double-ping
+        [880.0, 1046.5].forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.15);
+          gain.gain.setValueAtTime(0.35, ctx.currentTime + idx * 0.15);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.15 + 0.4);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + idx * 0.15);
+          osc.stop(ctx.currentTime + idx * 0.15 + 0.4);
+        });
+      }
+    } catch (err) {
+      console.warn("Audio chime playback error:", err);
+    }
+  };
+
+  const handleTestChime = () => {
+    getOrInitAudioContext();
+    playChime("NEW_ORDER");
+    toast.success("🎵 Audio alert test chime played.");
   };
 
   // Realtime Kitchen Stream
   useRealtime({
     "order.created": (newOrder: Order) => {
-      setOrders((prev) => [newOrder, ...prev]);
-      playChime();
+      setOrders((prev) => [newOrder, ...prev.filter((o) => o.id !== newOrder.id)]);
+      playChime("NEW_ORDER");
       toast.info(`🔔 New Order received: #${newOrder.order_number} (${newOrder.table?.table_number || "Table"})`, {
-        duration: 5000,
+        duration: 6000,
       });
     },
     "order.additional_item_added": (updatedOrder: Order) => {
       setOrders((prev) =>
         prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
       );
-      playChime();
-      toast.warning(`⚠️ Additional item added to order #${updatedOrder.order_number}!`);
+      playChime("ADDITIONAL_ITEM");
+      toast.warning(`⚠️ Additional item added to order #${updatedOrder.order_number}!`, {
+        duration: 6000,
+      });
     },
     "order.accepted": (updatedOrder: Order) => {
       setOrders((prev) => prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o)));
@@ -97,6 +148,8 @@ export default function ChefDashboard() {
         const updated = await res.json();
         setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
         toast.success(`Order #${updated.order_number} status updated to ${newStatus}`);
+      } else {
+        toast.error("Failed to update status");
       }
     } catch (err) {
       toast.error("Status update failed");
@@ -156,9 +209,18 @@ export default function ChefDashboard() {
           </div>
 
           {/* Audio Chime and Station Controls */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setSoundEnabled(!soundEnabled)}
+              onClick={handleTestChime}
+              className="px-2.5 py-1.5 rounded-xl border border-[#D8B58A]/30 bg-[#D8B58A]/10 text-[#D8B58A] text-xs font-medium hover:bg-[#D8B58A]/20 transition-colors"
+            >
+              Test Sound
+            </button>
+            <button
+              onClick={() => {
+                getOrInitAudioContext();
+                setSoundEnabled(!soundEnabled);
+              }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-colors ${
                 soundEnabled
                   ? "bg-[#6FAF82]/15 border-[#6FAF82]/30 text-[#6FAF82]"
@@ -166,11 +228,12 @@ export default function ChefDashboard() {
               }`}
             >
               {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-              <span>{soundEnabled ? "Audio Alert: ON" : "Audio Alert: MUTE"}</span>
+              <span>{soundEnabled ? "Audio: ON" : "Audio: MUTE"}</span>
             </button>
           </div>
         </div>
       </section>
+
 
       {/* Filter Tabs */}
       <div className="px-4 sm:px-6 pt-4 max-w-7xl mx-auto w-full">

@@ -16,6 +16,7 @@ interface OrderCardProps {
 
 export function OrderCard({ order, userRole = "CHEF", onStatusChange, onAddItemClick }: OrderCardProps) {
   const [elapsedMinutes, setElapsedMinutes] = useState(0);
+  const [isActionPending, setIsActionPending] = useState(false);
 
   useEffect(() => {
     const calculateElapsed = () => {
@@ -26,6 +27,16 @@ export function OrderCard({ order, userRole = "CHEF", onStatusChange, onAddItemC
     const interval = setInterval(calculateElapsed, 30000);
     return () => clearInterval(interval);
   }, [order.created_at]);
+
+  const handleStatusChangeInternal = async (orderId: string, newStatus: OrderStatus, estimatedMinutes?: number) => {
+    if (!onStatusChange || isActionPending) return;
+    setIsActionPending(true);
+    try {
+      await onStatusChange(orderId, newStatus, estimatedMinutes);
+    } finally {
+      setIsActionPending(false);
+    }
+  };
 
   const isDelayed = elapsedMinutes > (order.estimated_time_minutes || 15);
 
@@ -159,10 +170,11 @@ export function OrderCard({ order, userRole = "CHEF", onStatusChange, onAddItemC
             <Button
               variant="primary"
               size="sm"
-              onClick={() => onStatusChange(order.id, "ACCEPTED", 15)}
+              disabled={isActionPending}
+              onClick={() => handleStatusChangeInternal(order.id, "ACCEPTED", 15)}
               className="text-xs px-3"
             >
-              Accept & Start
+              {isActionPending ? "Updating..." : "Accept & Start"}
             </Button>
           )}
 
@@ -170,10 +182,11 @@ export function OrderCard({ order, userRole = "CHEF", onStatusChange, onAddItemC
             <Button
               variant="primary"
               size="sm"
-              onClick={() => onStatusChange(order.id, "PREPARING")}
+              disabled={isActionPending}
+              onClick={() => handleStatusChangeInternal(order.id, "PREPARING")}
               className="text-xs px-3"
             >
-              Start Cooking
+              {isActionPending ? "Updating..." : "Start Cooking"}
             </Button>
           )}
 
@@ -181,11 +194,12 @@ export function OrderCard({ order, userRole = "CHEF", onStatusChange, onAddItemC
             <Button
               variant="success"
               size="sm"
-              onClick={() => onStatusChange(order.id, "READY")}
+              disabled={isActionPending}
+              onClick={() => handleStatusChangeInternal(order.id, "READY")}
               className="text-xs px-3 shadow-md"
             >
               <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-              Mark Ready
+              {isActionPending ? "Updating..." : "Mark Ready"}
             </Button>
           )}
 
@@ -193,10 +207,11 @@ export function OrderCard({ order, userRole = "CHEF", onStatusChange, onAddItemC
             <Button
               variant="success"
               size="sm"
-              onClick={() => onStatusChange(order.id, "SERVED")}
+              disabled={isActionPending}
+              onClick={() => handleStatusChangeInternal(order.id, "SERVED")}
               className="text-xs px-3"
             >
-              Mark Served
+              {isActionPending ? "Updating..." : "Mark Served"}
             </Button>
           )}
         </div>
@@ -204,4 +219,5 @@ export function OrderCard({ order, userRole = "CHEF", onStatusChange, onAddItemC
     </div>
   );
 }
+
 

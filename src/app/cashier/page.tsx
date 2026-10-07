@@ -65,7 +65,11 @@ export default function CashierDashboard() {
     },
   });
 
+  const [dateFilter, setDateFilter] = useState<"ALL" | "TODAY" | "7DAYS">("ALL");
+  const [isSettling, setIsSettling] = useState(false);
+
   const handleSettlePayment = async (billId: string, method: "CASH" | "CARD" | "UPI") => {
+    setIsSettling(true);
     try {
       const res = await fetch(`/api/bills/${billId}/pay`, {
         method: "POST",
@@ -78,15 +82,19 @@ export default function CashierDashboard() {
         setBills((prev) => prev.map((b) => (b.id === billId ? updated : b)));
         setSelectedBillForPay(null);
         toast.success(`Bill #${updated.bill_number} settled with ${method}!`);
+      } else {
+        toast.error("Failed to settle bill");
       }
     } catch {
       toast.error("Failed to settle bill");
+    } finally {
+      setIsSettling(false);
     }
   };
 
   const handleCreateManualBill = async () => {
     if (!manualTableId || !manualCustomerName || manualSelectedItems.length === 0) {
-      toast.error("Please fill in table, customer name, and at least one item.");
+      toast.error("Please select a table, enter customer name, and add at least one item.");
       return;
     }
 
@@ -112,6 +120,9 @@ export default function CashierDashboard() {
         setManualCustomerPhone("");
         setManualSelectedItems([]);
         toast.success("Manual bill created successfully!");
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Failed to create manual bill");
       }
     } catch {
       toast.error("Failed to create manual bill");
@@ -129,17 +140,41 @@ export default function CashierDashboard() {
   };
 
   const filteredBills = bills.filter((b) => {
+    // 1. Tab match
     const matchesTab =
       activeTab === "ALL" ||
       (activeTab === "REQUESTED" && b.status === "REQUESTED") ||
       (activeTab === "PAID" && b.status === "PAID");
 
-    const matchesSearch =
-      b.bill_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (b.table?.table_number && b.table.table_number.toLowerCase().includes(searchQuery.toLowerCase()));
+    // 2. Date match
+    let matchesDate = true;
+    if (dateFilter === "TODAY") {
+      const todayStr = new Date().toISOString().split("T")[0];
+      matchesDate = b.created_at ? b.created_at.startsWith(todayStr) : true;
+    } else if (dateFilter === "7DAYS") {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+      matchesDate = b.created_at ? b.created_at >= sevenDaysAgo : true;
+    }
 
-    return matchesTab && matchesSearch;
+    // 3. Search match (Bill #, Table #, Customer Name, Order #)
+    if (!searchQuery.trim()) {
+      return matchesTab && matchesDate;
+    }
+
+    const q = searchQuery.toLowerCase().trim();
+    const billNumMatch = b.bill_number?.toLowerCase().includes(q);
+    const tableNumMatch = b.table?.table_number?.toLowerCase().includes(q);
+
+    // Check associated orders for this table session
+    const matchingOrders = orders.filter(
+      (o) => (o.session_id === b.session_id || o.table_id === b.table_id) &&
+        (o.customer_name?.toLowerCase().includes(q) || o.order_number?.toLowerCase().includes(q))
+    );
+
+    const matchesSearch = billNumMatch || tableNumMatch || matchingOrders.length > 0;
+    return matchesTab && matchesDate && matchesSearch;
   });
+
 
   return (
     <div className="min-h-screen bg-[#080808] flex flex-col text-[#F6EFE7]">
@@ -177,39 +212,70 @@ export default function CashierDashboard() {
           </div>
         </div>
 
-        {/* Tab Filters */}
-        <div className="flex items-center gap-2 border-b border-[#242424] pb-3">
-          <button
-            onClick={() => setActiveTab("REQUESTED")}
-            className={`px-4 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-              activeTab === "REQUESTED"
-                ? "bg-[#D8B58A] text-[#080808]"
-                : "bg-[#171717] text-[#A8A29E] hover:text-[#F6EFE7]"
-            }`}
-          >
-            Pending Settlement ({bills.filter((b) => b.status === "REQUESTED").length})
-          </button>
-          <button
-            onClick={() => setActiveTab("PAID")}
-            className={`px-4 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-              activeTab === "PAID"
-                ? "bg-[#6FAF82] text-[#080808]"
-                : "bg-[#171717] text-[#A8A29E] hover:text-[#F6EFE7]"
-            }`}
-          >
-            Settled Receipts ({bills.filter((b) => b.status === "PAID").length})
-          </button>
-          <button
-            onClick={() => setActiveTab("ALL")}
-            className={`px-4 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-              activeTab === "ALL"
-                ? "bg-[#242424] text-[#F6EFE7]"
-                : "bg-[#171717] text-[#A8A29E] hover:text-[#F6EFE7]"
-            }`}
-          >
-            All Bills ({bills.length})
-          </button>
+        {/* Tab & Date Filters */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#242424] pb-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab("REQUESTED")}
+              className={`px-4 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                activeTab === "REQUESTED"
+                  ? "bg-[#D8B58A] text-[#080808]"
+                  : "bg-[#171717] text-[#A8A29E] hover:text-[#F6EFE7]"
+              }`}
+            >
+              Pending Settlement ({bills.filter((b) => b.status === "REQUESTED").length})
+            </button>
+            <button
+              onClick={() => setActiveTab("PAID")}
+              className={`px-4 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                activeTab === "PAID"
+                  ? "bg-[#6FAF82] text-[#080808]"
+                  : "bg-[#171717] text-[#A8A29E] hover:text-[#F6EFE7]"
+              }`}
+            >
+              Settled Receipts ({bills.filter((b) => b.status === "PAID").length})
+            </button>
+            <button
+              onClick={() => setActiveTab("ALL")}
+              className={`px-4 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                activeTab === "ALL"
+                  ? "bg-[#242424] text-[#F6EFE7]"
+                  : "bg-[#171717] text-[#A8A29E] hover:text-[#F6EFE7]"
+              }`}
+            >
+              All Bills ({bills.length})
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="text-[#A8A29E] text-[11px]">Period:</span>
+            <button
+              onClick={() => setDateFilter("ALL")}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
+                dateFilter === "ALL" ? "bg-[#D8B58A]/20 text-[#D8B58A] border border-[#D8B58A]/40" : "bg-[#171717] text-[#A8A29E]"
+              }`}
+            >
+              All Time
+            </button>
+            <button
+              onClick={() => setDateFilter("TODAY")}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
+                dateFilter === "TODAY" ? "bg-[#D8B58A]/20 text-[#D8B58A] border border-[#D8B58A]/40" : "bg-[#171717] text-[#A8A29E]"
+              }`}
+            >
+              Today
+            </button>
+            <button
+              onClick={() => setDateFilter("7DAYS")}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
+                dateFilter === "7DAYS" ? "bg-[#D8B58A]/20 text-[#D8B58A] border border-[#D8B58A]/40" : "bg-[#171717] text-[#A8A29E]"
+              }`}
+            >
+              Past 7 Days
+            </button>
+          </div>
         </div>
+
 
         {/* Bills Grid */}
         {isLoading ? (

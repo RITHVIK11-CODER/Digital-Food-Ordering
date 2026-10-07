@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getMenuItemByIdFromDb, updateMenuItemInDb } from "@/lib/supabase/db";
+import { getMenuItemByIdFromDb, updateMenuItemInDb, deleteMenuItemInDb } from "@/lib/supabase/db";
 import { cafeStore } from "@/lib/store/cafe-store";
 import { extractAuthContext, verifyPermission } from "@/lib/auth/rbac";
 
@@ -42,3 +42,28 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 }
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const auth = extractAuthContext(request);
+
+    if (!verifyPermission(auth.role, "MANAGE_MENU")) {
+      return NextResponse.json(
+        { error: "Forbidden: Only Owner or Operations Manager can delete menu items." },
+        { status: 403 }
+      );
+    }
+
+    const dbDeleted = await deleteMenuItemInDb(id);
+    return NextResponse.json({ success: true, deleted: dbDeleted });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+}
+
+
+

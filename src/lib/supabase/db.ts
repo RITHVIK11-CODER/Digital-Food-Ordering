@@ -260,6 +260,18 @@ export async function createMenuItemInDb(itemData: any): Promise<MenuItem | null
   return data;
 }
 
+export async function deleteMenuItemInDb(id: string): Promise<boolean> {
+  const supabase = getAdminSupabaseClient();
+  if (!supabase) return false;
+
+  const { error } = await supabase.from("menu_items").delete().eq("id", id);
+  if (error) {
+    console.error("deleteMenuItemInDb error:", error.message);
+    return false;
+  }
+  return true;
+}
+
 // ORDER CREATION & MANAGEMENT
 export async function createOrderInDb(params: {
   tableId: string;
@@ -753,4 +765,106 @@ export async function getUsersFromDb(): Promise<User[]> {
   if (error) return [];
   return data || [];
 }
+
+// 15-DAY ROLLING ANALYTICS AGGREGATOR FROM SUPABASE
+export async function getAnalyticsFromDb() {
+  const supabase = getAdminSupabaseClient();
+  if (!supabase) return null;
+
+  try {
+    const now = new Date();
+    const fifteenDaysAgo = new Date(now.getTime() - 15 * 86400000);
+
+    const { data: dbOrders, error } = await supabase
+      .from("orders")
+      .select(`
+        *,
+        items:order_items(*)
+      `)
+      .gte("created_at", fifteenDaysAgo.toISOString())
+      .order("created_at", { ascending: false });
+
+    if (error || !dbOrders) {
+      console.error("getAnalyticsFromDb error:", error?.message);
+      return null;
+    }
+
+    const completedOrders = dbOrders.filter((o) => o.status === "COMPLETED");
+
+    // Daily stats map for last 15 days
+    const dailyStatsMap: { [dateKey: string]: { date: string; orders: number; revenue: number; itemsSold: number } } = {};
+
+    for (let d = 14; d >= 0; d--) {
+      const targetDate = new Date(now.getTime() - d * 86400000);
+      const dateKey = targetDate.toISOString().split("T")[0];
+      const dateLabel = targetDate.toLocaleDateString("en-IN", { month: "short", day: "numeric" });
+      dailyStatsMap[dateKey] = { date: dateLabel, orders: 0, revenue: 0, itemsSold: 0 };
+    }
+
+    const itemSalesCount: { [itemName: string]: { name: string; count: number; revenue: number } } = {};
+    let totalRevenue = 0;
+    let totalItemsCount = 0;
+
+    completedOrders.forEach((ord) => {
+      const dateKey = ord.created_at ? ord.created_at.split("T")[0] : "";
+      const ordTotal = Number(ord.total || 0);
+
+      if (dailyStatsMap[dateKey]) {
+        dailyStatsMap[dateKey].orders += 1;
+        dailyStatsMap[dateKey].revenue += ordTotal;
+      }
+      totalRevenue += ordTotal;
+
+      ord.items?.forEach((item: any) => {
+        const qty = Number(item.quantity || 1);
+        const itemTot = Number(item.item_total || (item.item_price * qty));
+        totalItemsCount += qty;
+
+        if (dailyStatsMap[dateKey]) {
+          dailyStatsMap[dateKey].itemsSold += qty;
+        }
+
+        const name = item.item_name || "Dish";
+        if (!itemSalesCount[name]) {
+          itemSalesCount[name] = { name, count: 0, revenue: 0 };
+        }
+        itemSalesCount[name].count += qty;
+        itemSalesCount[name].revenue += itemTot;
+      });
+    });
+
+    const topSellingItems = Object.values(itemSalesCount)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const chartData = Object.values(dailyStatsMap);
+
+    const todayKey = now.toISOString().split("T")[0];
+    const todayStats = dailyStatsMap[todayKey] || { orders: 0, revenue: 0, itemsSold: 0 };
+
+    return {
+      today: {
+        revenue: todayStats.revenue,
+        orders: todayStats.orders,
+        itemsSold: todayStats.itemsSold,
+        averageOrderValue: todayStats.orders > 0 ? Math.round(todayStats.revenue / todayStats.orders) : 0,
+      },
+      fifteenDaysTotal: {
+        revenue: totalRevenue,
+        orders: completedOrders.length,
+        itemsSold: totalItemsCount,
+        averageOrderValue: completedOrders.length > 0 ? Math.round(totalRevenue / completedOrders.length) : 0,
+      },
+      dailyTrend: chartData,
+      topSellingItems,
+      activeOrdersCount: dbOrders.filter((o) => ["PENDING", "ACCEPTED", "PREPARING", "READY"].includes(o.status)).length,
+      preparingCount: dbOrders.filter((o) => o.status === "PREPARING").length,
+      readyCount: dbOrders.filter((o) => o.status === "READY").length,
+    };
+  } catch (err: any) {
+    console.error("getAnalyticsFromDb exception:", err?.message);
+    return null;
+  }
+}
+
 

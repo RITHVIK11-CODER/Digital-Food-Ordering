@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAnalyticsFromDb } from "@/lib/supabase/db";
 import { cafeStore } from "@/lib/store/cafe-store";
 import { extractAuthContext, verifyPermission } from "@/lib/auth/rbac";
 
@@ -13,9 +14,11 @@ export async function GET(request: Request) {
       );
     }
 
-    const analytics = cafeStore.getAnalytics();
+    const dbAnalytics = await getAnalyticsFromDb();
+    const analytics = dbAnalytics || cafeStore.getAnalytics();
     return NextResponse.json(analytics);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+

@@ -41,19 +41,37 @@ export function verifyPermission(role: UserRole, permissionKey: keyof typeof PER
   return allowedRoles.includes(role);
 }
 
+import { getStaffSessionFromCookieString, verifyStaffSessionToken } from "./staff-auth";
+
 /**
- * Validates request role from Authorization header, staff session, or request body.
+ * Validates request role from verified HTTP-only session cookie or Bearer session token.
+ * Never blindly trusts unverified client headers.
  */
 export function extractAuthContext(req: Request): AuthContext {
-  const authHeader = req.headers.get("x-staff-role") || req.headers.get("authorization");
-  
-  if (authHeader) {
-    const roleCandidate = authHeader.replace("Bearer ", "").toUpperCase() as UserRole;
-    if (["OWNER", "MANAGER", "CHEF", "WAITER", "CASHIER"].includes(roleCandidate)) {
-      return { role: roleCandidate };
+  // 1. Check HTTP-only cookie
+  const cookieHeader = req.headers.get("cookie");
+  const session = getStaffSessionFromCookieString(cookieHeader);
+  if (session) {
+    return {
+      role: session.role,
+      userId: session.userId,
+    };
+  }
+
+  // 2. Check signed Bearer token
+  const authHeader = req.headers.get("authorization");
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.replace("Bearer ", "").trim();
+    const tokenSession = verifyStaffSessionToken(token);
+    if (tokenSession) {
+      return {
+        role: tokenSession.role,
+        userId: tokenSession.userId,
+      };
     }
   }
 
+  // 3. Optional table session header for customer requests
   const tableSessionHeader = req.headers.get("x-table-session");
   return {
     role: "CUSTOMER",
