@@ -3,18 +3,28 @@
 import { useState, useEffect, useCallback } from "react";
 
 export type ConnectionQuality = "ONLINE" | "SLOW" | "OFFLINE";
+export type RealtimeStatusType = "CONNECTED" | "RECONNECTING" | "DISCONNECTED";
 
 export interface NetworkStatus {
   quality: ConnectionQuality;
   latencyMs: number | null;
   isOnline: boolean;
+  realtimeStatus: RealtimeStatusType;
   isRealtimeConnected: boolean;
   lastChecked: Date | null;
   checkNow: () => Promise<void>;
 }
 
-export function useNetworkStatus(isRealtimeConnected = true): NetworkStatus {
+export function useNetworkStatus(realtimeStatusInput: RealtimeStatusType | boolean = "CONNECTED"): NetworkStatus {
+  const realtimeStatus: RealtimeStatusType =
+    typeof realtimeStatusInput === "string"
+      ? realtimeStatusInput
+      : realtimeStatusInput
+      ? "CONNECTED"
+      : "DISCONNECTED";
+
   const [isOnline, setIsOnline] = useState<boolean>(true);
+
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [quality, setQuality] = useState<ConnectionQuality>("ONLINE");
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
@@ -95,8 +105,11 @@ export function useNetworkStatus(isRealtimeConnected = true): NetworkStatus {
     quality,
     latencyMs,
     isOnline,
-    isRealtimeConnected,
+    realtimeStatus,
+    isRealtimeConnected: realtimeStatus === "CONNECTED",
     lastChecked,
     checkNow: checkPing,
   };
 }
+
+

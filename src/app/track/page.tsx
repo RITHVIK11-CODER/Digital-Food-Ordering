@@ -44,44 +44,61 @@ function TrackContent() {
     }
   }, [orderIdParam]);
 
-  // Realtime updates
-  useRealtime({
-    "order.accepted": (updatedOrder: Order) => {
-      if (order && updatedOrder.id === order.id) {
-        setOrder(updatedOrder);
-        toast.info("Chef has accepted your order!");
-      }
+  // Realtime updates with strict table/order isolation
+  const currentOrderId = order?.id || orderIdParam || undefined;
+
+  const realtime = useRealtime(
+    {
+      "order.created": (updatedOrder: Order) => {
+        if (!order || updatedOrder.id === order.id) {
+          fetchOrder(updatedOrder.id);
+        }
+      },
+      "order.accepted": (updatedOrder: Order) => {
+        if (!order || updatedOrder.id === order.id) {
+          fetchOrder(updatedOrder.id);
+          toast.info("Chef has accepted your order!");
+        }
+      },
+      "order.preparing": (updatedOrder: Order) => {
+        if (!order || updatedOrder.id === order.id) {
+          fetchOrder(updatedOrder.id);
+          toast.info("Your order is being prepared in the kitchen!");
+        }
+      },
+      "order.ready": (updatedOrder: Order) => {
+        if (!order || updatedOrder.id === order.id) {
+          fetchOrder(updatedOrder.id);
+          toast.success("Your culinary order is ready!");
+        }
+      },
+      "order.served": (updatedOrder: Order) => {
+        if (!order || updatedOrder.id === order.id) {
+          fetchOrder(updatedOrder.id);
+          toast.success("Order served! Savor your meal.");
+        }
+      },
+      "order.completed": (updatedOrder: Order) => {
+        if (!order || updatedOrder.id === order.id) {
+          fetchOrder(updatedOrder.id);
+        }
+      },
+      "order.updated": (updatedOrder: Order) => {
+        if (!order || updatedOrder.id === order.id) {
+          fetchOrder(updatedOrder.id);
+        }
+      },
+      "order.additional_item_added": (data: any) => {
+        const targetId = data?.order_id || data?.id;
+        if (targetId && (!order || targetId === order.id)) {
+          fetchOrder(targetId);
+          toast.info("Additional items added to your order.");
+        }
+      },
     },
-    "order.preparing": (updatedOrder: Order) => {
-      if (order && updatedOrder.id === order.id) {
-        setOrder(updatedOrder);
-        toast.info("Your order is being prepared in the kitchen!");
-      }
-    },
-    "order.ready": (updatedOrder: Order) => {
-      if (order && updatedOrder.id === order.id) {
-        setOrder(updatedOrder);
-        toast.success("Your culinary order is ready!");
-      }
-    },
-    "order.served": (updatedOrder: Order) => {
-      if (order && updatedOrder.id === order.id) {
-        setOrder(updatedOrder);
-        toast.success("Order served! Savor your meal.");
-      }
-    },
-    "order.completed": (updatedOrder: Order) => {
-      if (order && updatedOrder.id === order.id) {
-        setOrder(updatedOrder);
-      }
-    },
-    "order.additional_item_added": (updatedOrder: Order) => {
-      if (order && updatedOrder.id === order.id) {
-        setOrder(updatedOrder);
-        toast.info("Additional items added to your order.");
-      }
-    },
-  });
+    { orderId: currentOrderId }
+  );
+
 
   if (isLoading) {
     return <LoadingState message="Fetching live order status..." />;

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { LoadingState } from "@/components/ui/EmptyState";
 import { useRealtime } from "@/hooks/useRealtime";
 import { formatCurrency, formatTime } from "@/lib/utils";
-import { Bell, CheckCircle2, Plus, Sparkles, Utensils, X, User } from "lucide-react";
+import { Bell, CheckCircle2, Plus, Sparkles, Utensils, X, User, Volume2, VolumeX, Flame } from "lucide-react";
 import { toast } from "sonner";
 
 export default function WaiterDashboard() {
@@ -24,6 +24,70 @@ export default function WaiterDashboard() {
   const [itemQty, setItemQty] = useState<number>(1);
   const [itemNote, setItemNote] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [audioCtx, setAudioCtx] = useState<AudioContext | null>(null);
+
+  const getOrInitAudioContext = () => {
+    try {
+      let ctx = audioCtx;
+      if (!ctx || ctx.state === "closed") {
+        ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        setAudioCtx(ctx);
+      }
+      if (ctx.state === "suspended") {
+        ctx.resume();
+      }
+      return ctx;
+    } catch {
+      return null;
+    }
+  };
+
+  const playWaiterChime = (type: "ORDER_READY" | "SERVICE_CALL" = "ORDER_READY") => {
+    if (!soundEnabled) return;
+    try {
+      const ctx = getOrInitAudioContext();
+      if (!ctx) return;
+
+      if (type === "ORDER_READY") {
+        // Melodic 2-tone ready chime (E5 -> A5)
+        [659.25, 880.0].forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.15);
+          gain.gain.setValueAtTime(0.35, ctx.currentTime + idx * 0.15);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.15 + 0.4);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + idx * 0.15);
+          osc.stop(ctx.currentTime + idx * 0.15 + 0.4);
+        });
+      } else {
+        // Bell chime for service / bill calls (G5 -> C6)
+        [783.99, 1046.5].forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.12);
+          gain.gain.setValueAtTime(0.3, ctx.currentTime + idx * 0.12);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.12 + 0.5);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + idx * 0.12);
+          osc.stop(ctx.currentTime + idx * 0.12 + 0.5);
+        });
+      }
+    } catch (err) {
+      console.warn("Waiter audio chime error:", err);
+    }
+  };
+
+  const handleTestChime = () => {
+    getOrInitAudioContext();
+    playWaiterChime("ORDER_READY");
+    toast.success("🔔 Waiter alert test chime played.");
+  };
 
   const fetchData = async () => {
     try {
@@ -53,20 +117,34 @@ export default function WaiterDashboard() {
   }, []);
 
   // Realtime updates
-  useRealtime({
+  const realtime = useRealtime({
     "table.status_changed": (tbl: CafeTable) => {
       setTables((prev) => prev.map((t) => (t.id === tbl.id ? tbl : t)));
     },
     "service_request.created": (req: ServiceRequest) => {
-      setServiceRequests((prev) => [req, ...prev]);
+      setServiceRequests((prev) => [req, ...prev.filter((r) => r.id !== req.id)]);
+      playWaiterChime("SERVICE_CALL");
       toast.info(`🔔 Service request from ${req.table?.table_number || "Table"}: ${req.request_type}`);
     },
     "order.ready": (ord: Order) => {
       setOrders((prev) => prev.map((o) => (o.id === ord.id ? ord : o)));
-      toast.success(`🍽️ Order #${ord.order_number} for ${ord.table?.table_number || "Table"} is ready to serve!`);
+      playWaiterChime("ORDER_READY");
+      toast.success(`🍽️ Order #${ord.order_number} for ${ord.table?.table_number || "Table"} is ready to serve!`, {
+        duration: 7000,
+      });
     },
     "order.created": (ord: Order) => {
-      setOrders((prev) => [ord, ...prev]);
+      setOrders((prev) => [ord, ...prev.filter((o) => o.id !== ord.id)]);
+    },
+    "order.served": (ord: Order) => {
+      setOrders((prev) => prev.map((o) => (o.id === ord.id ? ord : o)));
+    },
+    "order.additional_item_added": (ord: Order) => {
+      setOrders((prev) => prev.map((o) => (o.id === ord.id ? ord : o)));
+    },
+    "bill.requested": (bill: any) => {
+      playWaiterChime("SERVICE_CALL");
+      toast.info(`🧾 Bill requested for ${bill.table?.table_number || "Table"}`);
     },
   });
 
@@ -125,6 +203,9 @@ export default function WaiterDashboard() {
         setItemQty(1);
         setItemNote("");
         toast.success("Additional item added and sent to Kitchen!");
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Failed to add item to order");
       }
     } catch {
       toast.error("Failed to add item to order");
@@ -140,7 +221,44 @@ export default function WaiterDashboard() {
         role="WAITER"
         staffName="Elena Rostova (Floor Lead)"
         onRefresh={fetchData}
+        isRealtimeConnected={realtime.isConnected}
       />
+
+      {/* Floor & Sound Controls Bar */}
+      <section className="bg-[#171717] border-b border-[#242424] px-4 sm:px-6 py-3">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <Utensils className="w-5 h-5 text-[#D8B58A]" />
+            <span className="font-serif text-base font-normal text-[#F6EFE7]">
+              Floor Station & Table Management
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleTestChime}
+              className="px-2.5 py-1.5 rounded-xl border border-[#D8B58A]/30 bg-[#D8B58A]/10 text-[#D8B58A] text-xs font-medium hover:bg-[#D8B58A]/20 transition-colors"
+            >
+              Test Sound
+            </button>
+            <button
+              onClick={() => {
+                getOrInitAudioContext();
+                setSoundEnabled(!soundEnabled);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-colors ${
+                soundEnabled
+                  ? "bg-[#6FAF82]/15 border-[#6FAF82]/30 text-[#6FAF82]"
+                  : "bg-[#242424] border-[#2e2e2e] text-[#A8A29E]"
+              }`}
+            >
+              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              <span>{soundEnabled ? "Audio: ON" : "Audio: MUTE"}</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
 
       <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 space-y-8">
         {/* Service Requests & Ready Orders Urgent Alert Banners */}

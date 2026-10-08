@@ -70,32 +70,52 @@ export function StaffHeader({
         </div>
 
         {/* Action Controls & Diagnostic Status */}
-        <div className="flex items-center gap-3">
-          {/* Network & Realtime Status Indicator */}
-          <div className="flex items-center gap-2 bg-[#171717] border border-[#242424] px-3 py-1.5 rounded-xl text-xs">
-            {network.quality === "ONLINE" ? (
-              <div className="flex items-center gap-1.5 text-[#6FAF82]">
-                <span className="w-2 h-2 rounded-full bg-[#6FAF82] animate-pulse" />
-                <span className="font-medium hidden md:inline">Live</span>
-                {network.latencyMs !== null && (
-                  <span className="text-[11px] text-[#A8A29E]">· {network.latencyMs}ms</span>
-                )}
-              </div>
-            ) : network.quality === "SLOW" ? (
-              <div className="flex items-center gap-1.5 text-[#D6A34A]">
-                <span className="w-2 h-2 rounded-full bg-[#D6A34A]" />
-                <span className="font-medium">Slow Connection</span>
-                {network.latencyMs !== null && (
-                  <span className="text-[11px] text-[#A8A29E]">· {network.latencyMs}ms</span>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5 text-[#C96B6B]">
-                <WifiOff className="w-3.5 h-3.5" />
-                <span className="font-medium">Offline</span>
-              </div>
-            )}
+        <div className="flex items-center gap-2.5">
+          {/* Dual Status Indicators: Network & Realtime */}
+          <div className="flex items-center gap-1.5 bg-[#171717] border border-[#242424] px-2.5 py-1 rounded-xl text-xs">
+            {/* Realtime WebSocket Stream Status */}
+            <div className="flex items-center gap-1 pr-2 border-r border-[#242424]">
+              {network.realtimeStatus === "CONNECTED" ? (
+                <div className="flex items-center gap-1 text-[#6FAF82]">
+                  <span className="w-2 h-2 rounded-full bg-[#6FAF82] animate-pulse" />
+                  <span className="text-[11px] font-semibold hidden md:inline">Realtime</span>
+                </div>
+              ) : network.realtimeStatus === "RECONNECTING" ? (
+                <div className="flex items-center gap-1 text-[#D6A34A]">
+                  <span className="w-2 h-2 rounded-full bg-[#D6A34A] animate-ping" />
+                  <span className="text-[11px] font-medium">Syncing</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 text-[#C96B6B]">
+                  <span className="w-2 h-2 rounded-full bg-[#C96B6B]" />
+                  <span className="text-[11px] font-medium">Realtime Disconnected</span>
+                </div>
+              )}
+            </div>
+
+            {/* Network / Latency Status */}
+            <div>
+              {network.quality === "ONLINE" ? (
+                <div className="flex items-center gap-1 text-[#A8A29E]">
+                  <Wifi className="w-3 h-3 text-[#6FAF82]" />
+                  {network.latencyMs !== null && (
+                    <span className="text-[10px] font-mono">{network.latencyMs}ms</span>
+                  )}
+                </div>
+              ) : network.quality === "SLOW" ? (
+                <div className="flex items-center gap-1 text-[#D6A34A]">
+                  <Activity className="w-3 h-3 text-[#D6A34A]" />
+                  <span className="text-[10px] font-mono">Slow</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 text-[#C96B6B]">
+                  <WifiOff className="w-3 h-3 text-[#C96B6B]" />
+                  <span className="text-[10px] font-mono">Offline</span>
+                </div>
+              )}
+            </div>
           </div>
+
 
           {/* Quick manual refresh */}
           {onRefresh && (

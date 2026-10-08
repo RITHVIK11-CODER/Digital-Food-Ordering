@@ -112,3 +112,4 @@ describe("Staff Authentication & PIN Security Suite", () => {
     expect(session?.staffName).toBe("David Miller");
   });
 });
+

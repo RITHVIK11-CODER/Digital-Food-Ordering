@@ -406,6 +406,18 @@ export async function createOrderInDb(params: {
     notes: "Order placed successfully",
   });
 
+  // Notify Chef of new order
+  try {
+    await supabase.from("notifications").insert({
+      recipient_role: "CHEF",
+      title: `New Order ${orderNumber}`,
+      message: `New order received for Table ${order.table?.table_number || "Table"}.`,
+      type: "NEW_ORDER",
+      link: "/chef",
+      metadata: { orderId: order.id, tableId: params.tableId },
+    });
+  } catch {}
+
   // Update table status
   await supabase.from("tables").update({ status: "OCCUPIED" }).eq("id", params.tableId);
 
@@ -514,8 +526,138 @@ export async function updateOrderStatusInDb(params: {
     notes: params.notes || `Order status transitioned to ${params.newStatus}`,
   });
 
+  // Notify Waiter on READY
+  if (params.newStatus === "READY") {
+    try {
+      await supabase.from("notifications").insert({
+        recipient_role: "WAITER",
+        title: "Order Ready for Pickup!",
+        message: `${currentOrder.order_number} for ${currentOrder.table?.table_number || "Table"} is ready to serve.`,
+        type: "ORDER_STATUS",
+        link: "/waiter",
+        metadata: { orderId: currentOrder.id, status: "READY" },
+      });
+    } catch {}
+  }
+
   return getOrderByIdFromDb(currentOrder.id);
 }
+
+
+export async function addAdditionalItemInDb(params: {
+  orderId: string;
+  menuItemId: string;
+  quantity: number;
+  specialNotes?: string;
+  selectedOptions?: Array<{ groupName: string; optionName: string; extraPrice: number }>;
+  staffId?: string;
+}): Promise<Order | null> {
+  const supabase = getAdminSupabaseClient();
+  if (!supabase) return null;
+
+  const currentOrder = await getOrderByIdFromDb(params.orderId);
+  if (!currentOrder) throw new Error("Order not found");
+  if (["COMPLETED", "CANCELLED", "REJECTED"].includes(currentOrder.status)) {
+    throw new Error(`Cannot add items to an order with status ${currentOrder.status}.`);
+  }
+
+  const { data: dbItem, error: itemErr } = await supabase
+    .from("menu_items")
+    .select("*")
+    .eq("id", params.menuItemId)
+    .single();
+
+  if (itemErr || !dbItem) throw new Error("Item not found in menu.");
+  if (!dbItem.is_available) throw new Error(`Item '${dbItem.name}' is currently unavailable.`);
+
+  let optionsExtraPrice = 0;
+  if (params.selectedOptions && params.selectedOptions.length > 0) {
+    optionsExtraPrice = params.selectedOptions.reduce((sum, opt) => sum + Number(opt.extraPrice || 0), 0);
+  }
+
+  const qty = Math.max(1, Math.floor(params.quantity));
+  const itemTotal = (Number(dbItem.price) + optionsExtraPrice) * qty;
+
+  // Insert Order Item
+  const { data: insertedItem, error: insertErr } = await supabase
+    .from("order_items")
+    .insert({
+      order_id: currentOrder.id,
+      menu_item_id: dbItem.id,
+      item_name: dbItem.name,
+      item_price: dbItem.price,
+      quantity: qty,
+      options_price: optionsExtraPrice,
+      item_total: itemTotal,
+      special_notes: params.specialNotes,
+      is_additional: true,
+      added_by_staff_id: params.staffId,
+    })
+    .select()
+    .single();
+
+  if (insertErr || !insertedItem) throw new Error(insertErr?.message || "Failed to insert order item");
+
+  if (params.selectedOptions && params.selectedOptions.length > 0) {
+    const optionsToInsert = params.selectedOptions.map((opt) => ({
+      order_item_id: insertedItem.id,
+      group_name: opt.groupName,
+      option_name: opt.optionName,
+      extra_price: opt.extraPrice,
+    }));
+    await supabase.from("order_item_options").insert(optionsToInsert);
+  }
+
+  // Recalculate order subtotal and tax
+  const settings = await getSettingsFromDb();
+  const taxRate = settings?.tax_rate ?? 5.0;
+  const serviceChargeRate = settings?.service_charge_rate ?? 0.0;
+
+  const { data: allItems } = await supabase
+    .from("order_items")
+    .select("*")
+    .eq("order_id", currentOrder.id);
+
+  const pricingInputs = (allItems || []).map((it) => ({
+    unitPrice: Number(it.item_price),
+    quantity: it.quantity,
+    optionsExtraPrice: Number(it.options_price || 0),
+  }));
+
+  const pricing = calculateOrderPricing(pricingInputs, taxRate, serviceChargeRate, Number(currentOrder.discount || 0));
+
+  // Update order totals
+  await supabase
+    .from("orders")
+    .update({
+      subtotal: pricing.subtotal,
+      tax: pricing.tax,
+      total: pricing.finalTotal,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", currentOrder.id);
+
+  // Insert Audit Event
+  await supabase.from("order_events").insert({
+    order_id: currentOrder.id,
+    new_status: currentOrder.status,
+    actor_type: params.staffId ? "WAITER" : "CUSTOMER",
+    notes: `Added +${qty}x ${dbItem.name} (+₹${itemTotal})`,
+  });
+
+  // Insert notification for Chef
+  await supabase.from("notifications").insert({
+    recipient_role: "CHEF",
+    title: `Additional Item Added: ${currentOrder.order_number}`,
+    message: `${currentOrder.table?.table_number || "Table"} added +${qty}x ${dbItem.name}`,
+    type: "ADDITIONAL_ITEM",
+    link: "/chef",
+    metadata: { orderId: currentOrder.id, item: dbItem.name, quantity: qty },
+  });
+
+  return getOrderByIdFromDb(currentOrder.id);
+}
+
 
 // BILLING & PAYMENTS
 export async function requestBillInDb(params: {
