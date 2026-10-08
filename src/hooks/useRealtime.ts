@@ -37,9 +37,13 @@ export function useRealtime(
       if (handler) {
         // Apply optional client-side filters if specified
         const opt = optionsRef.current;
-        if (opt?.orderId && data?.id && data.id !== opt.orderId) return;
-        if (opt?.tableId && data?.table_id && data.table_id !== opt.tableId) return;
-        if (opt?.sessionId && data?.session_id && data.session_id !== opt.sessionId) return;
+        const incomingId = data?.id || data?.order_id || data?.order?.id;
+        const incomingTableId = data?.table_id || data?.tableId;
+        const incomingSessionId = data?.session_id || data?.sessionId;
+
+        if (opt?.orderId && incomingId && incomingId !== opt.orderId) return;
+        if (opt?.tableId && incomingTableId && incomingTableId !== opt.tableId) return;
+        if (opt?.sessionId && incomingSessionId && incomingSessionId !== opt.sessionId) return;
 
         handler(data);
       }
@@ -54,13 +58,12 @@ export function useRealtime(
     let sseRetryTimer: NodeJS.Timeout | null = null;
 
     const supabase = createClient();
-    const channelId = `realtime_cafe_${Math.random().toString(36).substring(2, 9)}`;
+    const channelTopic = "cafe_realtime_stream";
 
     // 1. Primary: Supabase Realtime WebSocket Channel
-    const channel = supabase.channel(channelId, {
+    const channel = supabase.channel(channelTopic, {
       config: {
         broadcast: { ack: false },
-        presence: { key: channelId },
       },
     });
 

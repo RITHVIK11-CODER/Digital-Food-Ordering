@@ -36,18 +36,45 @@ export default function CartPage() {
 
   const handlePlaceOrder = async () => {
     if (items.length === 0) return;
-    if (!tableId || !sessionId) {
-      toast.error("Please scan a table QR code first or select a table.");
-      return;
+
+    let effectiveTableId = tableId;
+    let effectiveSessionId = sessionId;
+    let effectiveCustomerName = customerName?.trim() || "";
+
+    if (!effectiveTableId || !effectiveSessionId) {
+      try {
+        const stored = localStorage.getItem("vb_table_info");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          effectiveTableId = effectiveTableId || parsed.tableId || parsed.id;
+          effectiveSessionId = effectiveSessionId || parsed.sessionId;
+        }
+      } catch {}
+    }
+
+    if (!effectiveCustomerName) {
+      try {
+        const savedName = localStorage.getItem("vb_customer_name");
+        if (savedName) effectiveCustomerName = savedName.trim();
+      } catch {}
+    }
+
+    if (!effectiveCustomerName) {
+      effectiveCustomerName = "Valued Guest";
+    }
+
+    if (!effectiveTableId) {
+      effectiveTableId = "a0000000-0000-0000-0000-000000000001";
+      effectiveSessionId = effectiveSessionId || `sess_tbl_01_${Date.now()}`;
     }
 
     setIsSubmitting(true);
 
     try {
       const orderPayload = {
-        tableId,
-        sessionId,
-        customerName: customerName.trim() || "Guest",
+        tableId: effectiveTableId,
+        sessionId: effectiveSessionId,
+        customerName: effectiveCustomerName,
         customerPhone: phone.trim() || undefined,
         specialInstructions: specialInstructions.trim() || undefined,
         items: items.map((cartItem) => ({

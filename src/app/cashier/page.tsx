@@ -99,10 +99,12 @@ export default function CashierDashboard() {
   };
 
   const handleCreateManualBill = async () => {
-    if (!manualTableId || !manualCustomerName || manualSelectedItems.length === 0) {
-      toast.error("Please select a table, enter customer name, and add at least one item.");
+    if (!manualTableId || manualSelectedItems.length === 0) {
+      toast.error("Please select a table and add at least one item.");
       return;
     }
+
+    const effectiveName = manualCustomerName.trim() || "Walk-in Guest";
 
     try {
       const res = await fetch("/api/bills", {
@@ -111,7 +113,7 @@ export default function CashierDashboard() {
         body: JSON.stringify({
           isManual: true,
           tableId: manualTableId,
-          customerName: manualCustomerName,
+          customerName: effectiveName,
           customerPhone: manualCustomerPhone,
           items: manualSelectedItems,
           staffId: "b0000000-0000-0000-0000-000000000004",

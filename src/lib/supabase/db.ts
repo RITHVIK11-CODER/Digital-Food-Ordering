@@ -22,6 +22,39 @@ import { generateOrderNumber, generateBillNumber } from "../utils";
  * All mutations and queries run directly against Supabase PostgreSQL.
  */
 
+export async function broadcastRealtimeEvent(event: string, payload: any): Promise<void> {
+  const supabase = getAdminSupabaseClient();
+  if (!supabase) return;
+  try {
+    const channel = supabase.channel("cafe_realtime_stream", {
+      config: { broadcast: { self: true } },
+    });
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(() => resolve(), 1500);
+      channel.subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          try {
+            await channel.send({
+              type: "broadcast",
+              event,
+              payload,
+            });
+          } catch (sendErr: any) {
+            console.warn("[Broadcast] send error:", sendErr?.message);
+          }
+          clearTimeout(timer);
+          resolve();
+        } else if (status === "TIMED_OUT" || status === "CLOSED") {
+          clearTimeout(timer);
+          resolve();
+        }
+      });
+    });
+  } catch (err: any) {
+    console.warn("[Broadcast] Failed to broadcast event:", err.message);
+  }
+}
+
 // CAFE SETTINGS
 export async function getSettingsFromDb(): Promise<CafeSettings | null> {
   const supabase = getAdminSupabaseClient();
@@ -108,6 +141,9 @@ export async function updateTableInDb(tableId: string, updates: Partial<CafeTabl
     .single();
 
   if (error) return null;
+  if (data) {
+    await broadcastRealtimeEvent("table.status_changed", data);
+  }
   return data;
 }
 
@@ -421,8 +457,13 @@ export async function createOrderInDb(params: {
   // Update table status
   await supabase.from("tables").update({ status: "OCCUPIED" }).eq("id", params.tableId);
 
-  // Return full order
-  return getOrderByIdFromDb(order.id) as Promise<Order>;
+  // Return full order & broadcast
+  const fullOrder = await getOrderByIdFromDb(order.id);
+  const resultOrder = (fullOrder || order) as Order;
+  await broadcastRealtimeEvent("order.created", resultOrder);
+  await broadcastRealtimeEvent("table.status_changed", { id: params.tableId, status: "OCCUPIED" });
+
+  return resultOrder;
 }
 
 export async function getOrdersFromDb(filters?: { tableId?: string; sessionId?: string; status?: OrderStatus }): Promise<Order[]> {
@@ -546,7 +587,13 @@ export async function updateOrderStatusInDb(params: {
     } catch {}
   }
 
-  return getOrderByIdFromDb(currentOrder.id);
+  const updatedOrder = await getOrderByIdFromDb(currentOrder.id);
+  const finalOrder = updatedOrder || currentOrder;
+  await broadcastRealtimeEvent("order.updated", finalOrder);
+  if (params.newStatus) {
+    await broadcastRealtimeEvent(`order.${params.newStatus.toLowerCase()}`, finalOrder);
+  }
+  return finalOrder;
 }
 
 
@@ -661,7 +708,16 @@ export async function addAdditionalItemInDb(params: {
     metadata: { orderId: currentOrder.id, item: dbItem.name, quantity: qty },
   });
 
-  return getOrderByIdFromDb(currentOrder.id);
+  const updatedOrder = await getOrderByIdFromDb(currentOrder.id);
+  const finalOrder = updatedOrder || currentOrder;
+  await broadcastRealtimeEvent("order.additional_item_added", {
+    order: finalOrder,
+    item: insertedItem,
+    order_id: currentOrder.id,
+    id: currentOrder.id,
+  });
+  await broadcastRealtimeEvent("order.updated", finalOrder);
+  return finalOrder;
 }
 
 
@@ -732,7 +788,13 @@ export async function requestBillInDb(params: {
   // Update table status
   await supabase.from("tables").update({ status: "BILL_REQUESTED" }).eq("id", params.tableId);
 
-  return getBillByIdFromDb(bill.id) as Promise<Bill>;
+  const fullBill = await getBillByIdFromDb(bill.id);
+  const finalBill = (fullBill || bill) as Bill;
+  await broadcastRealtimeEvent("bill.requested", finalBill);
+  await broadcastRealtimeEvent("bill.updated", finalBill);
+  await broadcastRealtimeEvent("table.status_changed", { id: params.tableId, status: "BILL_REQUESTED" });
+
+  return finalBill;
 }
 
 export async function getBillsFromDb(): Promise<Bill[]> {
@@ -814,7 +876,14 @@ export async function markBillPaidInDb(billId: string, paymentMethod: "CASH" | "
     .eq("session_id", currentBill.session_id)
     .neq("status", "CANCELLED");
 
-  return getBillByIdFromDb(currentBill.id) as Promise<Bill>;
+  const fullBill = await getBillByIdFromDb(currentBill.id);
+  const finalBill = (fullBill || currentBill) as Bill;
+  await broadcastRealtimeEvent("payment.completed", finalBill);
+  await broadcastRealtimeEvent("bill.updated", finalBill);
+  await broadcastRealtimeEvent("table.status_changed", { id: currentBill.table_id, status: "CLEANING" });
+  await broadcastRealtimeEvent("order.completed", { table_id: currentBill.table_id, session_id: currentBill.session_id, id: currentBill.order_id });
+
+  return finalBill;
 }
 
 // REVIEWS
@@ -873,6 +942,9 @@ export async function createServiceRequestInDb(tableId: string, sessionId: strin
     .single();
 
   if (error) throw new Error(error.message);
+  if (data) {
+    await broadcastRealtimeEvent("service_request.created", data);
+  }
   return data;
 }
 
@@ -901,6 +973,9 @@ export async function updateServiceRequestStatusInDb(id: string, status: any): P
     .single();
 
   if (error) throw new Error(error.message);
+  if (data) {
+    await broadcastRealtimeEvent("service_request.updated", data);
+  }
   return data;
 }
 

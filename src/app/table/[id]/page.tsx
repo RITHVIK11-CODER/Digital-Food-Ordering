@@ -22,7 +22,10 @@ export default function TableQRRoute() {
 
     const verifyTable = async () => {
       try {
-        const res = await fetch(`/api/tables/${tableIdOrToken}`);
+        const res = await fetch(`/api/tables/${tableIdOrToken}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" },
+        });
         if (!res.ok) {
           throw new Error("Invalid or expired table QR code.");
         }
