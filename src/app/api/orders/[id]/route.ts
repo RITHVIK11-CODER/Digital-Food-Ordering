@@ -5,6 +5,9 @@ import { UpdateOrderStatusSchema } from "@/lib/validation/schemas";
 import { extractAuthContext, verifyPermission } from "@/lib/auth/rbac";
 import { UserRole } from "@/types/database.types";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -17,7 +20,11 @@ export async function GET(
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
-    return NextResponse.json(order);
+    return NextResponse.json(order, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      },
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -63,8 +70,8 @@ export async function PATCH(
         notes: validated.notes,
         estimatedMinutes: validated.estimatedMinutes,
       });
-    } catch {
-      // Fallback
+    } catch (dbErr: any) {
+      console.warn("DB update failed, attempting store fallback:", dbErr.message);
     }
 
     if (!order) {
@@ -78,8 +85,13 @@ export async function PATCH(
       });
     }
 
-    return NextResponse.json(order);
+    return NextResponse.json(order, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      },
+    });
   } catch (error: any) {
+    console.error("PATCH /api/orders/[id] error:", error.message);
     return NextResponse.json({ error: error.message || "Failed to update status" }, { status: 400 });
   }
 }

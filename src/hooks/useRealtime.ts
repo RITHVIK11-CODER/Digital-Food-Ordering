@@ -177,10 +177,29 @@ export function useRealtime(
       if (!isSubscribed) return;
       if (statusResult === "SUBSCRIBED") {
         setStatus("CONNECTED");
+        optionsRef.current?.onReconnect?.();
       } else if (statusResult === "CLOSED" || statusResult === "TIMED_OUT") {
         setStatus("RECONNECTING");
       }
     });
+
+    const handleOnline = () => {
+      if (isSubscribed) {
+        setStatus("CONNECTED");
+        optionsRef.current?.onReconnect?.();
+      }
+    };
+
+    const handleOffline = () => {
+      if (isSubscribed) {
+        setStatus("RECONNECTING");
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("online", handleOnline);
+      window.addEventListener("offline", handleOffline);
+    }
 
     // 2. Secondary Stream: Resilient Fallback SSE connection
     const connectSSE = () => {
@@ -238,6 +257,10 @@ export function useRealtime(
       supabase.removeChannel(channel);
       if (sseSource) sseSource.close();
       if (sseRetryTimer) clearTimeout(sseRetryTimer);
+      if (typeof window !== "undefined") {
+        window.removeEventListener("online", handleOnline);
+        window.removeEventListener("offline", handleOffline);
+      }
     };
   }, [dispatchEvent]);
 

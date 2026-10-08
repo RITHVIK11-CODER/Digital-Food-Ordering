@@ -61,11 +61,11 @@ export default function OwnerDashboard() {
   const fetchData = async () => {
     try {
       const [aRes, mRes, tRes, uRes, sRes] = await Promise.all([
-        fetch("/api/analytics"),
-        fetch("/api/menu"),
-        fetch("/api/tables"),
-        fetch("/api/users"),
-        fetch("/api/settings"),
+        fetch("/api/analytics", { cache: "no-store" }),
+        fetch("/api/menu", { cache: "no-store" }),
+        fetch("/api/tables", { cache: "no-store" }),
+        fetch("/api/users", { cache: "no-store" }),
+        fetch("/api/settings", { cache: "no-store" }),
       ]);
 
       if (aRes.ok) setAnalytics(await aRes.json());

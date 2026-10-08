@@ -17,7 +17,7 @@ export default function ChefDashboard() {
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch("/api/orders");
+      const res = await fetch("/api/orders", { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setOrders(data);
@@ -101,36 +101,30 @@ export default function ChefDashboard() {
   };
 
   // Realtime Kitchen Stream
-  useRealtime({
-    "order.created": (newOrder: Order) => {
-      setOrders((prev) => [newOrder, ...prev.filter((o) => o.id !== newOrder.id)]);
-      playChime("NEW_ORDER");
-      toast.info(`🔔 New Order received: #${newOrder.order_number} (${newOrder.table?.table_number || "Table"})`, {
-        duration: 6000,
-      });
+  useRealtime(
+    {
+      "order.created": (newOrder: Order) => {
+        fetchOrders();
+        playChime("NEW_ORDER");
+        toast.info(`🔔 New Order received: #${newOrder?.order_number || "New"}`, {
+          duration: 6000,
+        });
+      },
+      "order.additional_item_added": (updatedOrder: Order) => {
+        fetchOrders();
+        playChime("ADDITIONAL_ITEM");
+        toast.warning(`⚠️ Additional item added to order #${updatedOrder?.order_number || ""}!`, {
+          duration: 6000,
+        });
+      },
+      "order.accepted": () => fetchOrders(),
+      "order.preparing": () => fetchOrders(),
+      "order.ready": () => fetchOrders(),
+      "order.served": () => fetchOrders(),
+      "order.completed": () => fetchOrders(),
     },
-    "order.additional_item_added": (updatedOrder: Order) => {
-      setOrders((prev) =>
-        prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
-      );
-      playChime("ADDITIONAL_ITEM");
-      toast.warning(`⚠️ Additional item added to order #${updatedOrder.order_number}!`, {
-        duration: 6000,
-      });
-    },
-    "order.accepted": (updatedOrder: Order) => {
-      setOrders((prev) => prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o)));
-    },
-    "order.preparing": (updatedOrder: Order) => {
-      setOrders((prev) => prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o)));
-    },
-    "order.ready": (updatedOrder: Order) => {
-      setOrders((prev) => prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o)));
-    },
-    "order.served": (updatedOrder: Order) => {
-      setOrders((prev) => prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o)));
-    },
-  });
+    { onReconnect: fetchOrders }
+  );
 
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus, estimatedMinutes?: number) => {
     try {
@@ -147,12 +141,14 @@ export default function ChefDashboard() {
       if (res.ok) {
         const updated = await res.json();
         setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
-        toast.success(`Order #${updated.order_number} status updated to ${newStatus}`);
+        toast.success(`Order #${updated.order_number || "Status"} updated to ${newStatus}`);
+        fetchOrders();
       } else {
-        toast.error("Failed to update status");
+        const errData = await res.json().catch(() => ({}));
+        toast.error(errData.error || "Unable to update order status. Please try again.");
       }
-    } catch (err) {
-      toast.error("Status update failed");
+    } catch (err: any) {
+      toast.error(err.message || "Unable to update order status. Please try again.");
     }
   };
 

@@ -92,10 +92,10 @@ export default function WaiterDashboard() {
   const fetchData = async () => {
     try {
       const [tRes, oRes, sRes, mRes] = await Promise.all([
-        fetch("/api/tables"),
-        fetch("/api/orders"),
-        fetch("/api/service-requests"),
-        fetch("/api/menu"),
+        fetch("/api/tables", { cache: "no-store" }),
+        fetch("/api/orders", { cache: "no-store" }),
+        fetch("/api/service-requests", { cache: "no-store" }),
+        fetch("/api/menu", { cache: "no-store" }),
       ]);
 
       if (tRes.ok) setTables(await tRes.json());
@@ -117,36 +117,35 @@ export default function WaiterDashboard() {
   }, []);
 
   // Realtime updates
-  const realtime = useRealtime({
-    "table.status_changed": (tbl: CafeTable) => {
-      setTables((prev) => prev.map((t) => (t.id === tbl.id ? tbl : t)));
+  const realtime = useRealtime(
+    {
+      "table.status_changed": () => fetchData(),
+      "service_request.created": (req: ServiceRequest) => {
+        fetchData();
+        playWaiterChime("SERVICE_CALL");
+        toast.info(`🔔 Service request from ${req.table?.table_number || "Table"}: ${req.request_type || "Call"}`);
+      },
+      "order.ready": (ord: Order) => {
+        fetchData();
+        playWaiterChime("ORDER_READY");
+        toast.success(`🍽️ Order #${ord.order_number || "Ready"} for ${ord.table?.table_number || "Table"} is ready to serve!`, {
+          duration: 7000,
+        });
+      },
+      "order.created": () => fetchData(),
+      "order.served": () => fetchData(),
+      "order.accepted": () => fetchData(),
+      "order.preparing": () => fetchData(),
+      "order.completed": () => fetchData(),
+      "order.additional_item_added": () => fetchData(),
+      "bill.requested": (bill: any) => {
+        fetchData();
+        playWaiterChime("SERVICE_CALL");
+        toast.info(`🧾 Bill requested for ${bill.table?.table_number || "Table"}`);
+      },
     },
-    "service_request.created": (req: ServiceRequest) => {
-      setServiceRequests((prev) => [req, ...prev.filter((r) => r.id !== req.id)]);
-      playWaiterChime("SERVICE_CALL");
-      toast.info(`🔔 Service request from ${req.table?.table_number || "Table"}: ${req.request_type}`);
-    },
-    "order.ready": (ord: Order) => {
-      setOrders((prev) => prev.map((o) => (o.id === ord.id ? ord : o)));
-      playWaiterChime("ORDER_READY");
-      toast.success(`🍽️ Order #${ord.order_number} for ${ord.table?.table_number || "Table"} is ready to serve!`, {
-        duration: 7000,
-      });
-    },
-    "order.created": (ord: Order) => {
-      setOrders((prev) => [ord, ...prev.filter((o) => o.id !== ord.id)]);
-    },
-    "order.served": (ord: Order) => {
-      setOrders((prev) => prev.map((o) => (o.id === ord.id ? ord : o)));
-    },
-    "order.additional_item_added": (ord: Order) => {
-      setOrders((prev) => prev.map((o) => (o.id === ord.id ? ord : o)));
-    },
-    "bill.requested": (bill: any) => {
-      playWaiterChime("SERVICE_CALL");
-      toast.info(`🧾 Bill requested for ${bill.table?.table_number || "Table"}`);
-    },
-  });
+    { onReconnect: fetchData }
+  );
 
   const handleResolveServiceRequest = async (id: string) => {
     try {
@@ -158,6 +157,7 @@ export default function WaiterDashboard() {
       if (res.ok) {
         setServiceRequests((prev) => prev.filter((r) => r.id !== id));
         toast.success("Request resolved.");
+        fetchData();
       }
     } catch {
       toast.error("Failed to resolve request");
@@ -174,10 +174,14 @@ export default function WaiterDashboard() {
       if (res.ok) {
         const updated = await res.json();
         setOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
-        toast.success(`Order #${updated.order_number} marked as served!`);
+        toast.success(`Order #${updated.order_number || "Status"} marked as served!`);
+        fetchData();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        toast.error(errData.error || "Unable to update order status. Please try again.");
       }
-    } catch {
-      toast.error("Failed to mark served");
+    } catch (err: any) {
+      toast.error(err.message || "Unable to update order status. Please try again.");
     }
   };
 

@@ -23,7 +23,7 @@ function TrackContent() {
 
   const fetchOrder = async (id: string) => {
     try {
-      const res = await fetch(`/api/orders/${id}`);
+      const res = await fetch(`/api/orders/${id}`, { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setOrder(data);

@@ -30,10 +30,10 @@ export default function CashierDashboard() {
   const fetchData = async () => {
     try {
       const [bRes, tRes, mRes, oRes] = await Promise.all([
-        fetch("/api/bills"),
-        fetch("/api/tables"),
-        fetch("/api/menu"),
-        fetch("/api/orders"),
+        fetch("/api/bills", { cache: "no-store" }),
+        fetch("/api/tables", { cache: "no-store" }),
+        fetch("/api/menu", { cache: "no-store" }),
+        fetch("/api/orders", { cache: "no-store" }),
       ]);
 
       if (bRes.ok) setBills(await bRes.json());
@@ -55,15 +55,21 @@ export default function CashierDashboard() {
   }, []);
 
   // Realtime updates
-  useRealtime({
-    "bill.requested": (newBill: Bill) => {
-      setBills((prev) => [newBill, ...prev.filter((b) => b.id !== newBill.id)]);
-      toast.info(`🔔 Bill requested by ${newBill.table?.table_number || "Table"} (${formatCurrency(newBill.final_total)})`);
+  useRealtime(
+    {
+      "bill.requested": (newBill: Bill) => {
+        fetchData();
+        toast.info(`🔔 Bill requested by ${newBill.table?.table_number || "Table"} (${formatCurrency(newBill.final_total)})`);
+      },
+      "payment.completed": () => fetchData(),
+      "order.created": () => fetchData(),
+      "order.additional_item_added": () => fetchData(),
+      "order.served": () => fetchData(),
+      "order.completed": () => fetchData(),
+      "order.ready": () => fetchData(),
     },
-    "payment.completed": (paidBill: Bill) => {
-      setBills((prev) => prev.map((b) => (b.id === paidBill.id ? paidBill : b)));
-    },
-  });
+    { onReconnect: fetchData }
+  );
 
   const [dateFilter, setDateFilter] = useState<"ALL" | "TODAY" | "7DAYS">("ALL");
   const [isSettling, setIsSettling] = useState(false);

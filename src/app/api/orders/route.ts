@@ -3,6 +3,9 @@ import { getOrdersFromDb, createOrderInDb } from "@/lib/supabase/db";
 import { cafeStore } from "@/lib/store/cafe-store";
 import { CreateOrderSchema } from "@/lib/validation/schemas";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -12,7 +15,11 @@ export async function GET(request: Request) {
 
     const dbOrders = await getOrdersFromDb({ tableId, sessionId, status });
     const orders = dbOrders.length > 0 ? dbOrders : cafeStore.getOrders({ tableId, sessionId, status });
-    return NextResponse.json(orders);
+    return NextResponse.json(orders, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      },
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

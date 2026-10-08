@@ -3,11 +3,18 @@ import { getSettingsFromDb, updateSettingsInDb } from "@/lib/supabase/db";
 import { cafeStore } from "@/lib/store/cafe-store";
 import { extractAuthContext, verifyPermission } from "@/lib/auth/rbac";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET() {
   try {
     const dbSettings = await getSettingsFromDb();
     const settings = dbSettings || cafeStore.getSettings();
-    return NextResponse.json(settings);
+    return NextResponse.json(settings, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      },
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

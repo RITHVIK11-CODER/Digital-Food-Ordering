@@ -4,11 +4,18 @@ import { cafeStore } from "@/lib/store/cafe-store";
 import { CreateManualBillSchema } from "@/lib/validation/schemas";
 import { extractAuthContext, verifyPermission } from "@/lib/auth/rbac";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET() {
   try {
     const dbBills = await getBillsFromDb();
     const bills = dbBills.length > 0 ? dbBills : cafeStore.getBills();
-    return NextResponse.json(bills);
+    return NextResponse.json(bills, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      },
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

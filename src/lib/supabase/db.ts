@@ -517,14 +517,20 @@ export async function updateOrderStatusInDb(params: {
   const { error } = await supabase.from("orders").update(updates).eq("id", currentOrder.id);
   if (error) throw new Error(error.message);
 
-  // Insert Audit Event
-  await supabase.from("order_events").insert({
-    order_id: currentOrder.id,
-    previous_status: currentOrder.status,
-    new_status: params.newStatus,
-    actor_type: params.actorType,
-    notes: params.notes || `Order status transitioned to ${params.newStatus}`,
-  });
+  // Insert Audit Event safely
+  try {
+    const cleanActorId = params.actorId && UUID_REGEX.test(params.actorId) ? params.actorId : undefined;
+    await supabase.from("order_events").insert({
+      order_id: currentOrder.id,
+      previous_status: currentOrder.status,
+      new_status: params.newStatus,
+      actor_type: params.actorType,
+      actor_id: cleanActorId,
+      notes: params.notes || `Order status transitioned to ${params.newStatus}`,
+    });
+  } catch (evErr: any) {
+    console.warn("Audit event insert warning:", evErr.message);
+  }
 
   // Notify Waiter on READY
   if (params.newStatus === "READY") {
